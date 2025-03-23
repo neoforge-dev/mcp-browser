@@ -231,4 +231,53 @@ Now shifting focus to:
 - **May 2024**: Implement WebSocket event subscriptions and verification agent functionality
 - **May 2024**: Implement monitoring and metrics collection
 - **June 2024**: Enhance developer experience with documentation and CLI tools
-- **June 2024**: Production readiness with comprehensive security and testing 
+- **June 2024**: Production readiness with comprehensive security and testing
+
+## Working Features
+
+- Browser control via HTTP API
+- HTTP API endpoints for all core browser actions
+- Basic navigation commands (go, back, forward, refresh)
+- DOM interaction (click, check visibility, wait for element)
+- Data extraction (extract text, screenshot)
+- JavaScript execution in the browser context
+- MCP Protocol Extensions
+- WebSocket event subscriptions for real-time browser event monitoring
+- Test utilities for both API and WebSocket features
+
+## Current Status
+
+**Version:** 0.4.0
+
+The MCP Browser now supports all core protocol extensions and WebSocket event subscriptions. The event subscription system allows clients to subscribe to various browser events (PAGE, DOM, CONSOLE, NETWORK) and receive real-time notifications when these events occur.
+
+Key components implemented:
+- HTTP API for browser control and interaction
+- WebSocket endpoint for real-time browser events 
+- Event subscription management endpoints
+- Event filtering by URL pattern and page ID
+- Comprehensive documentation of the WebSocket events feature
+
+## What's Left to Build
+
+- Browser context management (multiple browser instances)
+- Additional DOM manipulation commands
+- Network interception and modification
+- Cookie and storage management
+- Performance metrics collection
+- Integration with external tools and services
+
+## Known Issues
+
+- WebSocket connection might drop if the browser is heavily loaded
+- Some edge cases in event filtering need to be handled
+- Better error reporting for failed subscriptions
+- Performance optimization for high-volume event broadcasting
+
+## Next Development Priorities
+
+1. Add browser context management for multi-session support
+2. Implement additional DOM manipulation commands
+3. Add network interception capabilities
+4. Add comprehensive error handling throughout the application
+5. Create a client library in Python for easier integration 

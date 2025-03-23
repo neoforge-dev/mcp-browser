@@ -16,9 +16,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from playwright.async_api import async_playwright
 import uvicorn
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Callable, Set, Union
 import time
+from enum import Enum
+from contextlib import asynccontextmanager
+import httpx
+import re
+import datetime
+import base64
+import aiofiles
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +34,52 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("mcp-browser")
+
+# Event type and subscription models
+class EventType(str, Enum):
+    """Types of browser events"""
+    PAGE = "PAGE"
+    DOM = "DOM"
+    CONSOLE = "CONSOLE"
+    NETWORK = "NETWORK"
+
+class EventName(str, Enum):
+    """Specific event names"""
+    # Page events
+    PAGE_LOAD = "page.load"
+    PAGE_ERROR = "page.error"
+    PAGE_LIFECYCLE = "page.lifecycle"
+    
+    # DOM events
+    DOM_MUTATION = "dom.mutation"
+    DOM_ATTRIBUTE = "dom.attribute"
+    DOM_CHILD = "dom.child"
+    
+    # Console events
+    CONSOLE_LOG = "console.log"
+    CONSOLE_ERROR = "console.error"
+    CONSOLE_WARNING = "console.warning"
+    
+    # Network events
+    NETWORK_REQUEST = "network.request"
+    NETWORK_RESPONSE = "network.response"
+    NETWORK_ERROR = "network.error"
+
+class EventSubscriptionModel(BaseModel):
+    """Model for event subscriptions"""
+    subscription_id: str
+    client_id: str
+    event_types: List[str]
+    filters: Optional[Dict[str, Any]] = None
+    created_at: float = Field(default_factory=time.time)
+
+class BrowserEvent(BaseModel):
+    """Model for browser events"""
+    type: EventType
+    event: str
+    timestamp: float = Field(default_factory=time.time)
+    page_id: Optional[str] = None
+    data: Dict[str, Any]
 
 # Simple MCP Client implementation
 class MCPClient:
@@ -254,6 +308,87 @@ mcp_client = None
 # WebSocket connections
 active_connections = []
 
+# Event subscriptions
+event_connections = {}  # client_id -> WebSocket connection
+active_subscriptions = {}  # subscription_id -> EventSubscriptionModel
+subscription_handlers = {}  # event_name -> list of subscription_ids
+
+# Event utility functions
+async def broadcast_event(event: BrowserEvent):
+    """Broadcast event to all subscribed clients"""
+    # Find subscriptions for this event
+    event_key = event.event
+    if event_key not in subscription_handlers:
+        return
+    
+    # Get subscriptions for this event
+    subscription_ids = subscription_handlers.get(event_key, [])
+    if not subscription_ids:
+        return
+    
+    for sub_id in subscription_ids:
+        subscription = active_subscriptions.get(sub_id)
+        if not subscription:
+            continue
+        
+        # Check filters if they exist
+        if subscription.filters:
+            if not _matches_filters(event, subscription.filters):
+                continue
+        
+        # Send event to subscribed client
+        websocket = event_connections.get(subscription.client_id)
+        if websocket:
+            try:
+                await websocket.send_json(event.dict())
+            except Exception as e:
+                logger.error(f"Error sending event to client {subscription.client_id}: {e}")
+
+def _matches_filters(event: BrowserEvent, filters: Dict[str, Any]) -> bool:
+    """Check if event matches the filters"""
+    # URL pattern matching
+    if 'url_pattern' in filters and event.data.get('url'):
+        import fnmatch
+        if not fnmatch.fnmatch(event.data['url'], filters['url_pattern']):
+            return False
+    
+    # Page ID matching
+    if 'page_id' in filters and event.page_id:
+        if event.page_id != filters['page_id']:
+            return False
+    
+    # Additional custom filters can be added here
+    
+    return True
+
+async def add_subscription(subscription: EventSubscriptionModel):
+    """Add a new subscription"""
+    subscription_id = subscription.subscription_id
+    active_subscriptions[subscription_id] = subscription
+    
+    # Register subscription for each event type
+    for event_type in subscription.event_types:
+        if event_type not in subscription_handlers:
+            subscription_handlers[event_type] = []
+        subscription_handlers[event_type].append(subscription_id)
+    
+    return subscription_id
+
+async def remove_subscription(subscription_id: str):
+    """Remove a subscription"""
+    if subscription_id not in active_subscriptions:
+        return False
+    
+    subscription = active_subscriptions.pop(subscription_id)
+    
+    # Remove from event handlers
+    for event_type in subscription.event_types:
+        if event_type in subscription_handlers:
+            if subscription_id in subscription_handlers[event_type]:
+                subscription_handlers[event_type].remove(subscription_id)
+    
+    return True
+
 # Define request models
 class ViewportModel(BaseModel):
     width: int = 1280
@@ -311,6 +446,10 @@ async def startup_event():
             playwright = await async_playwright().start()
             browser = await playwright.chromium.launch(headless=True)
             browser_context = await browser.new_context()
+            
+            # Set up page event listeners for any new pages
+            browser_context.on("page", handle_new_page)
+            
             logger.info("Playwright browser initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Playwright browser: {e}")
@@ -1089,7 +1228,7 @@ async def capture_screenshot(
         
         if params["format"] == "jpeg" and params["quality"] is not None:
             screenshot_options["quality"] = params["quality"]
-        
+            
         screenshot_base64 = await page.screenshot(**screenshot_options)
         
         # Close the page
@@ -1848,6 +1987,159 @@ async def test_responsive(
             content={"error": f"Error in responsive testing: {str(e)}"}
         )
 
+@app.websocket("/ws/browser/events")
+async def websocket_browser_events(websocket: WebSocket):
+    """WebSocket endpoint for browser events"""
+    await websocket.accept()
+    
+    # Generate unique client ID
+    client_id = f"client_{int(time.time())}_{id(websocket)}"
+    event_connections[client_id] = websocket
+    
+    try:
+        # Send initial connection message
+        await websocket.send_json({"type": "connection", "client_id": client_id, "status": "connected"})
+        
+        # Process incoming messages (subscription requests)
+        while True:
+            try:
+                data = await websocket.receive_json()
+                action = data.get("action")
+                
+                if action == "subscribe":
+                    # Create subscription from request
+                    subscription_data = data.get("subscription", {})
+                    subscription = EventSubscriptionModel(
+                        subscription_id=subscription_data.get("subscription_id", f"sub_{int(time.time())}_{id(websocket)}"),
+                        client_id=client_id,
+                        event_types=subscription_data.get("event_types", []),
+                        filters=subscription_data.get("filters")
+                    )
+                    
+                    # Add subscription
+                    await add_subscription(subscription)
+                    await websocket.send_json({
+                        "type": "subscription_response",
+                        "status": "subscribed",
+                        "subscription_id": subscription.subscription_id,
+                        "event_types": subscription.event_types
+                    })
+                
+                elif action == "unsubscribe":
+                    # Remove subscription
+                    subscription_id = data.get("subscription_id")
+                    if subscription_id:
+                        success = await remove_subscription(subscription_id)
+                        await websocket.send_json({
+                            "type": "subscription_response",
+                            "status": "unsubscribed" if success else "not_found",
+                            "subscription_id": subscription_id
+                        })
+                
+                elif action == "list_subscriptions":
+                    # List all active subscriptions for this client
+                    client_subscriptions = [
+                        sub.dict() for sub_id, sub in active_subscriptions.items()
+                        if sub.client_id == client_id
+                    ]
+                    await websocket.send_json({
+                        "type": "subscription_list",
+                        "subscriptions": client_subscriptions
+                    })
+                
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Unknown action: {action}"
+                    })
+            
+            except json.JSONDecodeError:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON message"
+                })
+    
+    except WebSocketDisconnect:
+        # Clean up client subscriptions on disconnect
+        client_subscriptions = [
+            sub_id for sub_id, sub in active_subscriptions.items()
+            if sub.client_id == client_id
+        ]
+        for sub_id in client_subscriptions:
+            await remove_subscription(sub_id)
+        
+        if client_id in event_connections:
+            del event_connections[client_id]
+    
+    except Exception as e:
+        logger.error(f"WebSocket error in browser events: {e}")
+        if client_id in event_connections:
+            del event_connections[client_id]
+
+# API endpoints for subscription management
+@app.post("/api/browser/events/subscribe")
+async def subscribe_to_events(subscription: EventSubscriptionModel):
+    """Subscribe to browser events"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        subscription_id = await add_subscription(subscription)
+        return {
+            "success": True,
+            "subscription_id": subscription_id,
+            "message": f"Subscribed to events: {', '.join(subscription.event_types)}"
+        }
+    except Exception as e:
+        logger.error(f"Error subscribing to events: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/browser/events/subscriptions")
+async def list_subscriptions(client_id: str):
+    """List active event subscriptions for a client"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        # Find all subscriptions for this client
+        client_subscriptions = [
+            sub.dict() for sub_id, sub in active_subscriptions.items()
+            if sub.client_id == client_id
+        ]
+        return {
+            "success": True,
+            "client_id": client_id,
+            "subscriptions": client_subscriptions,
+            "count": len(client_subscriptions)
+        }
+    except Exception as e:
+        logger.error(f"Error listing subscriptions: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.delete("/api/browser/events/unsubscribe")
+async def unsubscribe_from_events(subscription_id: str):
+    """Unsubscribe from browser events"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        success = await remove_subscription(subscription_id)
+        if success:
+            return {
+                "success": True,
+                "subscription_id": subscription_id,
+                "message": "Unsubscribed successfully"
+            }
+        else:
+            return {
+                "success": False,
+                "subscription_id": subscription_id,
+                "error": "Subscription not found"
+            }
+    except Exception as e:
+        logger.error(f"Error unsubscribing from events: {e}")
+        return {"success": False, "error": str(e)}
+
 async def shutdown_gracefully():
     """Shutdown the application gracefully"""
     logger.info("Received shutdown signal. Shutting down...")
@@ -1858,6 +2150,227 @@ def handle_signal(sig, frame):
     """Handle process signals"""
     logger.info(f"Received signal {sig}")
     asyncio.create_task(shutdown_gracefully())
+
+# Browser event handling functions
+async def handle_new_page(page):
+    """Set up event listeners for a new page"""
+    logger.info(f"New page created: {page}")
+    
+    # Assign a unique ID to the page for event tracking
+    page_id = f"page_{int(time.time())}_{id(page)}"
+    
+    # Set up page event listeners
+    await setup_page_event_listeners(page, page_id)
+    
+    # Emit page creation event
+    await emit_page_event(page_id, EventName.PAGE_LIFECYCLE, {
+        "url": page.url,
+        "lifecycle": "created",
+        "timestamp": time.time()
+    })
+
+async def setup_page_event_listeners(page, page_id):
+    """Set up all event listeners for a page"""
+    # Page lifecycle events
+    page.on("load", lambda: asyncio.create_task(
+        emit_page_event(page_id, EventName.PAGE_LIFECYCLE, {
+            "url": page.url,
+            "lifecycle": "load",
+            "timestamp": time.time()
+        })
+    ))
+    
+    page.on("domcontentloaded", lambda: asyncio.create_task(
+        emit_page_event(page_id, EventName.PAGE_LIFECYCLE, {
+            "url": page.url,
+            "lifecycle": "domcontentloaded",
+            "timestamp": time.time()
+        })
+    ))
+    
+    # Console events
+    page.on("console", lambda msg: asyncio.create_task(
+        emit_console_event(page_id, msg)
+    ))
+    
+    # Page error events
+    page.on("pageerror", lambda err: asyncio.create_task(
+        emit_page_event(page_id, EventName.PAGE_ERROR, {
+            "url": page.url,
+            "error": str(err),
+            "timestamp": time.time()
+        })
+    ))
+    
+    # Network events
+    page.on("request", lambda request: asyncio.create_task(
+        emit_network_event(page_id, EventName.NETWORK_REQUEST, request)
+    ))
+    
+    page.on("response", lambda response: asyncio.create_task(
+        emit_network_event(page_id, EventName.NETWORK_RESPONSE, response)
+    ))
+    
+    page.on("requestfailed", lambda request: asyncio.create_task(
+        emit_network_event(page_id, EventName.NETWORK_ERROR, request)
+    ))
+    
+    # Set up DOM mutation observer
+    await page.evaluate("""() => {
+        window.__mcp_dom_observer = new MutationObserver((mutations) => {
+            const events = [];
+            
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    events.push({
+                        type: 'dom.child',
+                        target: mutation.target.tagName,
+                        addedNodes: mutation.addedNodes.length,
+                        removedNodes: mutation.removedNodes.length
+                    });
+                } else if (mutation.type === 'attributes') {
+                    events.push({
+                        type: 'dom.attribute',
+                        target: mutation.target.tagName,
+                        attributeName: mutation.attributeName,
+                        oldValue: mutation.oldValue
+                    });
+                } else if (mutation.type === 'characterData') {
+                    events.push({
+                        type: 'dom.mutation',
+                        target: mutation.target.parentNode ? mutation.target.parentNode.tagName : 'TEXT',
+                        oldValue: mutation.oldValue
+                    });
+                }
+            }
+            
+            if (events.length > 0) {
+                window.__mcp_dom_events = window.__mcp_dom_events || [];
+                window.__mcp_dom_events.push(...events);
+            }
+        });
+        
+        window.__mcp_dom_observer.observe(document.documentElement, {
+            childList: true,
+            attributes: true,
+            characterData: true,
+            subtree: true,
+            attributeOldValue: true,
+            characterDataOldValue: true
+        });
+        
+        window.__mcp_dom_events = [];
+    }""")
+    
+    # Set up interval to poll for DOM events
+    asyncio.create_task(poll_dom_events(page, page_id))
+
+async def poll_dom_events(page, page_id):
+    """Poll for accumulated DOM events"""
+    try:
+        while True:
+            # Only poll while the page is still active
+            if page.is_closed():
+                break
+                
+            # Get accumulated DOM events
+            dom_events = await page.evaluate("""() => {
+                const events = window.__mcp_dom_events || [];
+                window.__mcp_dom_events = [];
+                return events;
+            }""")
+            
+            # Emit each DOM event
+            for event in dom_events:
+                event_type = event.get("type", "dom.mutation")
+                await emit_dom_event(page_id, event_type, event)
+                
+            # Wait before polling again
+            await asyncio.sleep(0.5)  # Poll every 500ms
+    except Exception as e:
+        logger.error(f"Error polling DOM events: {e}")
+
+# Event emission functions
+async def emit_page_event(page_id, event_name, data):
+    """Emit a page-related event"""
+    event = BrowserEvent(
+        type=EventType.PAGE,
+        event=event_name,
+        page_id=page_id,
+        data=data
+    )
+    await broadcast_event(event)
+
+async def emit_console_event(page_id, console_msg):
+    """Emit a console event"""
+    event_type = EventName.CONSOLE_LOG
+    
+    # Map console message type to event type
+    if console_msg.type == "error":
+        event_type = EventName.CONSOLE_ERROR
+    elif console_msg.type == "warning":
+        event_type = EventName.CONSOLE_WARNING
+    
+    event = BrowserEvent(
+        type=EventType.CONSOLE,
+        event=event_type,
+        page_id=page_id,
+        data={
+            "type": console_msg.type,
+            "text": console_msg.text,
+            "location": {
+                "url": console_msg.location.get("url", ""),
+                "lineNumber": console_msg.location.get("lineNumber", 0),
+                "columnNumber": console_msg.location.get("columnNumber", 0)
+            } if hasattr(console_msg, "location") else {}
+        }
+    )
+    await broadcast_event(event)
+
+async def emit_network_event(page_id, event_name, request_or_response):
+    """Emit a network event"""
+    data = {}
+    
+    # Handle both request and response objects
+    if event_name == EventName.NETWORK_REQUEST:
+        data = {
+            "url": request_or_response.url,
+            "method": request_or_response.method,
+            "headers": request_or_response.headers,
+            "resourceType": request_or_response.resource_type
+        }
+    elif event_name == EventName.NETWORK_RESPONSE:
+        data = {
+            "url": request_or_response.url,
+            "status": request_or_response.status,
+            "statusText": request_or_response.status_text,
+            "headers": request_or_response.headers
+        }
+    elif event_name == EventName.NETWORK_ERROR:
+        data = {
+            "url": request_or_response.url,
+            "method": request_or_response.method,
+            "resourceType": request_or_response.resource_type,
+            "error": str(request_or_response.failure())
+        }
+    
+    event = BrowserEvent(
+        type=EventType.NETWORK,
+        event=event_name,
+        page_id=page_id,
+        data=data
+    )
+    await broadcast_event(event)
+
+async def emit_dom_event(page_id, event_name, data):
+    """Emit a DOM event"""
+    event = BrowserEvent(
+        type=EventType.DOM,
+        event=event_name,
+        page_id=page_id,
+        data=data
+    )
+    await broadcast_event(event)
 
 if __name__ == "__main__":
     # Register signal handlers

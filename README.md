@@ -7,6 +7,7 @@ A headless browser interface for the Model Control Protocol (MCP).
 - Headless browser automation using Playwright
 - Web UI for browser interaction
 - WebSocket communication for real-time updates
+- Real-time browser event subscription system
 - Integration with MCP for AI agents
 
 ## Prerequisites
@@ -78,6 +79,23 @@ The following environment variables can be set:
 - `GET /`: Web UI
 - `GET /api/status`: Get browser and MCP client status
 - `WebSocket /ws`: WebSocket endpoint for real-time communication
+- `WebSocket /ws/browser/events`: WebSocket endpoint for browser event subscriptions
+- `GET /api/browser/subscribe`: Subscribe to browser events
+- `GET /api/browser/unsubscribe`: Unsubscribe from browser events
+- `GET /api/browser/subscriptions`: List active event subscriptions
+
+## Event Subscriptions
+
+The MCP Browser supports real-time event subscriptions via WebSockets. This allows clients to receive browser events as they happen, including:
+
+- Page events (navigation, load, error)
+- DOM events (mutations, changes)
+- Console events (logs, warnings, errors)
+- Network events (requests, responses, errors)
+
+For detailed documentation and examples of the event subscription system, see:
+- [WebSocket Events Documentation](./WEBSOCKET_EVENTS.md)
+- [Event Subscription Example](./examples/event_subscription_example.py)
 
 ## License
 
