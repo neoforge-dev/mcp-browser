@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Python Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Logging & Debugging
+*.log
+logs/
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE & editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+.ropeproject
+.spyderproject
+.spyproject
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Docker
+.docker/data/
+
+# uv
+.uv/
+
+# Temp files
+tmp/
+temp/
+
+# Local configurations
+*.local
+local_config.yaml
+local_settings.py
+
+# MCP Browser specific
+ms-playwright/
+*.db
+*.sqlite3 
