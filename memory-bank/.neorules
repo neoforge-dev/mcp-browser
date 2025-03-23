@@ -1,0 +1,115 @@
+# NEO Rules for MCP Browser Project
+
+## Project-Specific Patterns
+
+1. **Docker-First Development**
+   - Always test changes in Docker environment before committing
+   - Use volume mounts for local development to speed up iteration
+   - Keep Docker images slim by using multi-stage builds where appropriate
+
+2. **Security Considerations**
+   - Never run browser processes as root
+   - Always use environment variables for secrets
+   - Apply AppArmor profiles for all containers
+   - Validate and sanitize all user inputs
+   - Use virtual display server (Xvfb) for isolation
+
+3. **Python Best Practices**
+   - Use async/await for all IO operations
+   - Type hint all functions for better IDE support
+   - Use dataclasses for structured data
+   - Prefer composition over inheritance
+   - Use dependency injection for testability
+
+4. **Playwright Usage Patterns**
+   - Create isolated browser contexts for each session
+   - Handle browser errors with structured error types
+   - Use page.evaluate sparingly for better performance
+   - Manage browser resources carefully (close pages when done)
+   - Use stealth mode for more realistic browser behavior
+
+5. **MCP Protocol Extensions**
+   - Follow existing MCP patterns for tool definitions
+   - Return structured JSON for all responses
+   - Use WebSockets for real-time events
+   - Include metadata with all responses (timing, etc.)
+   - Namespace browser-specific tools appropriately
+
+## User Preferences
+
+1. **Code Organization**
+   - Module structure: src/[module]/[feature].py
+   - Test structure: tests/[module]/test_[feature].py
+   - Separation of UI, business logic, and data access
+   - Configuration via environment variables, not files
+   - Documentation in Markdown format
+
+2. **Testing Approach**
+   - Unit tests for all core functionality
+   - Integration tests for API endpoints
+   - Browser tests run in a similar container environment
+   - Mocking external dependencies for unit tests
+   - Test coverage target: 80%+
+
+3. **Documentation Style**
+   - RESTful API documented with OpenAPI
+   - Code comments focus on "why" not "what"
+   - README-driven development (write docs first)
+   - Example scripts for common operations
+   - Architecture diagrams in ASCII format for version control
+
+4. **Deployment Preferences**
+   - One-command deployment with Docker Compose
+   - Environment-specific configuration via .env files
+   - Health checks for all services
+   - Graceful shutdown handling
+   - Automatic restart capabilities
+
+## Known Project Challenges
+
+1. **Resource Management**
+   - Browser automation can be memory-intensive
+   - Monitor and adjust container resource limits
+   - Consider pooling browser instances for efficiency
+   - Implement garbage collection for abandoned sessions
+
+2. **Cross-Platform Compatibility**
+   - Local development on macOS, deployment on Linux
+   - Xvfb doesn't work the same on all platforms
+   - Use Docker to normalize environments
+   - Document platform-specific quirks
+
+3. **Security Balancing**
+   - Need security, but also need browser functionality
+   - AppArmor profiles need careful configuration
+   - Balance between isolation and capabilities
+   - Regular security scanning for dependencies
+
+4. **Browser Automation Flakiness**
+   - Handle intermittent failures gracefully
+   - Implement retry mechanisms where appropriate
+   - Add detailed logging for debugging
+   - Use stable selectors for DOM elements
+
+5. **Performance Considerations**
+   - Browser startup time impacts user experience
+   - Consider browser pooling for improved responsiveness
+   - Optimize Docker image size for faster deployment
+   - Cache Playwright browser downloads
+
+## Learned Solutions
+
+1. **Problem**: Xvfb doesn't work properly on macOS for local testing
+   **Solution**: Use PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 environment variable and run in headless-only mode for local development on macOS
+
+2. **Problem**: Docker container restart fails to clean up Xvfb processes
+   **Solution**: Add trap handlers in xvfb-init.sh script to kill processes on exit signals
+
+3. **Problem**: Playwright browser download is slow
+   **Solution**: Use a specific browser (chromium only) instead of all browsers, and consider caching the download in a Docker volume
+
+4. **Problem**: WebSocket connections terminate unexpectedly
+   **Solution**: Implement ping/pong mechanism to keep connections alive and detect disconnections
+
+5. **Problem**: Resource limits too restrictive
+   **Solution**: Start with conservative limits and monitor actual usage, then adjust accordingly based on real-world metrics 
