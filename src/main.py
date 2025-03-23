@@ -10,12 +10,14 @@ import signal
 import yaml
 import json
 import requests
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Body, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from playwright.async_api import async_playwright
 import uvicorn
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 
 # Configure logging
 logging.basicConfig(
@@ -92,6 +94,31 @@ mcp_client = None
 
 # WebSocket connections
 active_connections = []
+
+# Define request models
+class ViewportModel(BaseModel):
+    width: int = 1280
+    height: int = 800
+
+class ScreenshotRequest(BaseModel):
+    url: str
+    viewport: Optional[ViewportModel] = None
+    full_page: bool = True
+    format: str = "png"
+    quality: Optional[int] = None
+    wait_until: str = "networkidle"
+
+class DomExtractionRequest(BaseModel):
+    url: str
+    selector: Optional[str] = None
+    include_styles: bool = False
+    include_attributes: bool = True
+
+class CssAnalysisRequest(BaseModel):
+    url: str
+    selector: str
+    properties: Optional[List[str]] = None
+    check_accessibility: bool = False
 
 @app.on_event("startup")
 async def startup_event():
@@ -339,12 +366,400 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/api/status")
 async def get_status():
-    """Return the status of the browser and MCP client"""
-    return {
-        "browser": "disabled" if HEADLESS_MODE else ("running" if browser else "not running"),
-        "headless_mode": HEADLESS_MODE,
-        "mcp": "connected" if mcp_client else "not connected"
-    }
+    """Get the current status of the MCP Browser"""
+    browser_status = "disabled (headless mode)" if HEADLESS_MODE else "running" if browser else "initializing"
+    return {"status": "ok", "browser": browser_status}
+
+@app.post("/api/screenshots/capture")
+async def capture_screenshot(
+    request: Optional[ScreenshotRequest] = None,
+    url: Optional[str] = Query(None),
+    full_page: bool = Query(True),
+    format: str = Query("png"),
+    quality: Optional[int] = Query(None),
+    wait_until: str = Query("networkidle"),
+    viewport: Optional[Dict[str, int]] = Body(None)
+):
+    """
+    Capture a screenshot of a web page
+    
+    Args:
+        url: The URL to navigate to
+        viewport: The viewport size (width and height)
+        full_page: Whether to capture the full page or just the viewport
+        format: The image format (png or jpeg)
+        quality: The image quality (for jpeg only)
+        wait_until: When to consider navigation finished
+    
+    Returns:
+        The screenshot as base64 encoded string
+    """
+    global browser, browser_context
+    
+    # Combine query params and request body
+    params = {}
+    if request:
+        params = request.dict()
+    else:
+        params = {
+            "url": url,
+            "full_page": full_page,
+            "format": format,
+            "quality": quality,
+            "wait_until": wait_until
+        }
+        if viewport:
+            params["viewport"] = viewport
+        else:
+            params["viewport"] = {"width": 1280, "height": 800}
+    
+    if not params.get("url"):
+        return {"error": "URL is required"}
+    
+    if HEADLESS_MODE or not browser:
+        return {"error": "Browser functionality is disabled or not initialized"}
+    
+    try:
+        # Create a new page
+        page = await browser_context.new_page()
+        
+        # Set viewport size
+        await page.set_viewport_size({"width": params["viewport"]["width"], "height": params["viewport"]["height"]})
+        
+        # Navigate to the URL
+        await page.goto(params["url"], wait_until=params["wait_until"])
+        
+        # Capture screenshot
+        screenshot_options = {
+            "full_page": params["full_page"],
+            "type": params["format"]
+        }
+        
+        if params["format"] == "jpeg" and params["quality"] is not None:
+            screenshot_options["quality"] = params["quality"]
+            
+        screenshot_base64 = await page.screenshot(**screenshot_options)
+        
+        # Close the page
+        await page.close()
+        
+        import base64
+        screenshot_base64_str = base64.b64encode(screenshot_base64).decode('utf-8')
+        
+        return {
+            "success": True,
+            "screenshot": screenshot_base64_str,
+            "format": params["format"],
+            "viewport": params["viewport"],
+            "url": params["url"]
+        }
+    except Exception as e:
+        logger.error(f"Error capturing screenshot: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/dom/extract")
+async def extract_dom(
+    request: Optional[DomExtractionRequest] = None,
+    url: Optional[str] = Query(None),
+    selector: Optional[str] = Query(None),
+    include_styles: bool = Query(False),
+    include_attributes: bool = Query(True)
+):
+    """
+    Extract DOM elements from a web page
+    
+    Args:
+        url: The URL to navigate to
+        selector: CSS selector for elements to extract (if None, extracts entire DOM)
+        include_styles: Whether to include computed styles
+        include_attributes: Whether to include element attributes
+    
+    Returns:
+        Dictionary with DOM information
+    """
+    global browser, browser_context
+    
+    # Combine query params and request body
+    params = {}
+    if request:
+        params = request.dict()
+    else:
+        params = {
+            "url": url,
+            "selector": selector,
+            "include_styles": include_styles,
+            "include_attributes": include_attributes
+        }
+    
+    if not params.get("url"):
+        return {"error": "URL is required"}
+    
+    if HEADLESS_MODE or not browser:
+        return {"error": "Browser functionality is disabled or not initialized"}
+    
+    try:
+        # Create a new page
+        page = await browser_context.new_page()
+        
+        # Navigate to the URL
+        await page.goto(params["url"], wait_until="networkidle")
+        
+        # Extract DOM information based on selector
+        if params["selector"]:
+            # Make sure the selector exists
+            try:
+                await page.wait_for_selector(params["selector"], timeout=5000)
+            except Exception as e:
+                await page.close()
+                return {"error": f"Selector not found: {params['selector']}"}
+                
+            # Extract DOM information for the selected elements
+            script = """
+            function extractDomInfo(selector, includeStyles, includeAttributes) {
+                const elements = Array.from(document.querySelectorAll(selector));
+                return elements.map(el => {
+                    const rect = el.getBoundingClientRect();
+                    const result = {
+                        tagName: el.tagName.toLowerCase(),
+                        textContent: el.textContent.trim(),
+                        isVisible: rect.width > 0 && rect.height > 0,
+                        boundingBox: {
+                            x: rect.x,
+                            y: rect.y,
+                            width: rect.width,
+                            height: rect.height
+                        },
+                        innerHTML: el.innerHTML
+                    };
+                    
+                    if (includeAttributes) {
+                        result.attributes = {};
+                        Array.from(el.attributes).forEach(attr => {
+                            result.attributes[attr.name] = attr.value;
+                        });
+                    }
+                    
+                    if (includeStyles) {
+                        result.styles = {};
+                        const computedStyle = window.getComputedStyle(el);
+                        for (let i = 0; i < computedStyle.length; i++) {
+                            const prop = computedStyle[i];
+                            result.styles[prop] = computedStyle.getPropertyValue(prop);
+                        }
+                    }
+                    
+                    return result;
+                });
+            }
+            return extractDomInfo(arguments[0], arguments[1], arguments[2]);
+            """
+            dom_info = await page.evaluate(script, params["selector"], params["include_styles"], params["include_attributes"])
+        else:
+            # Extract entire DOM structure
+            script = """
+            function processFullDom(includeStyles, includeAttributes) {
+                function processNode(node) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        return {
+                            type: 'text',
+                            content: node.textContent.trim()
+                        };
+                    }
+                    
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const result = {
+                            type: 'element',
+                            tagName: node.tagName.toLowerCase(),
+                            children: Array.from(node.childNodes).map(processNode).filter(n => {
+                                // Filter out empty text nodes
+                                return !(n.type === 'text' && n.content === '');
+                            })
+                        };
+                        
+                        if (includeAttributes) {
+                            result.attributes = {};
+                            Array.from(node.attributes).forEach(attr => {
+                                result.attributes[attr.name] = attr.value;
+                            });
+                        }
+                        
+                        if (includeStyles) {
+                            result.styles = {};
+                            const computedStyle = window.getComputedStyle(node);
+                            // Include only the most relevant styles to avoid huge output
+                            const relevantStyles = [
+                                'display', 'position', 'width', 'height', 'margin', 'padding',
+                                'color', 'background-color', 'font-size', 'font-family'
+                            ];
+                            relevantStyles.forEach(prop => {
+                                result.styles[prop] = computedStyle.getPropertyValue(prop);
+                            });
+                        }
+                        
+                        return result;
+                    }
+                    
+                    return null;
+                }
+                
+                return processNode(document.documentElement);
+            }
+            return processFullDom(arguments[0], arguments[1]);
+            """
+            dom_info = await page.evaluate(script, params["include_styles"], params["include_attributes"])
+        
+        # Close the page
+        await page.close()
+        
+        return {
+            "success": True,
+            "url": params["url"],
+            "dom": dom_info
+        }
+    except Exception as e:
+        logger.error(f"Error extracting DOM: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/css/analyze")
+async def analyze_css(
+    request: Optional[CssAnalysisRequest] = None,
+    url: Optional[str] = Query(None),
+    selector: Optional[str] = Query(None),
+    check_accessibility: bool = Query(False),
+    properties: Optional[List[str]] = Body(None)
+):
+    """
+    Analyze CSS properties for selected elements
+    
+    Args:
+        url: The URL to navigate to
+        selector: CSS selector for elements to analyze
+        properties: List of specific CSS properties to analyze (if None, returns most common properties)
+        check_accessibility: Whether to include accessibility-related checks
+    
+    Returns:
+        Dictionary with CSS analysis results
+    """
+    global browser, browser_context
+    
+    # Combine query params and request body
+    params = {}
+    if request:
+        params = request.dict()
+    else:
+        params = {
+            "url": url,
+            "selector": selector,
+            "properties": properties,
+            "check_accessibility": check_accessibility
+        }
+    
+    if not params.get("url"):
+        return {"error": "URL is required"}
+    
+    if not params.get("selector"):
+        return {"error": "Selector is required"}
+    
+    if HEADLESS_MODE or not browser:
+        return {"error": "Browser functionality is disabled or not initialized"}
+    
+    try:
+        # Create a new page
+        page = await browser_context.new_page()
+        
+        # Navigate to the URL
+        await page.goto(params["url"], wait_until="networkidle")
+        
+        # Make sure the selector exists
+        try:
+            await page.wait_for_selector(params["selector"], timeout=5000)
+        except Exception as e:
+            await page.close()
+            return {"error": f"Selector not found: {params['selector']}"}
+        
+        # If no specific properties requested, use a default set of important properties
+        if not params["properties"]:
+            params["properties"] = [
+                "display", "position", "width", "height", "margin", "padding",
+                "color", "background-color", "font-size", "font-family", "font-weight",
+                "border", "box-shadow", "text-align", "flex", "grid",
+                "opacity", "z-index", "overflow", "transition"
+            ]
+            
+        # Extract CSS information for the selected elements
+        script = """
+        function analyzeCss(selector, properties, checkAccessibility) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            const results = elements.map(el => {
+                const computedStyle = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                
+                // Basic element info
+                const result = {
+                    tagName: el.tagName.toLowerCase(),
+                    textContent: el.textContent.trim(),
+                    isVisible: rect.width > 0 && rect.height > 0,
+                    boundingBox: {
+                        x: rect.x,
+                        y: rect.y,
+                        width: rect.width,
+                        height: rect.height
+                    },
+                    styles: {}
+                };
+                
+                // Get the requested CSS properties
+                properties.forEach(prop => {
+                    result.styles[prop] = computedStyle.getPropertyValue(prop);
+                });
+                
+                // If accessibility checks are requested
+                if (checkAccessibility) {
+                    result.accessibility = {
+                        colorContrast: null,  // Will be filled in below if possible
+                        hasAltText: null,
+                        hasAriaLabel: Boolean(el.getAttribute('aria-label')),
+                        isFocusable: el.tabIndex >= 0
+                    };
+                    
+                    // Check for alt text on images
+                    if (el.tagName.toLowerCase() === 'img') {
+                        result.accessibility.hasAltText = Boolean(el.getAttribute('alt'));
+                    }
+                    
+                    // Color contrast calculation (simplified version)
+                    const bgColor = computedStyle.getPropertyValue('background-color');
+                    const textColor = computedStyle.getPropertyValue('color');
+                    if (bgColor && textColor) {
+                        // Here we'd normally calculate contrast ratio
+                        // This is simplified to just record the colors for later analysis
+                        result.accessibility.backgroundColor = bgColor;
+                        result.accessibility.textColor = textColor;
+                    }
+                }
+                
+                return result;
+            });
+            
+            return results;
+        }
+        return analyzeCss(arguments[0], arguments[1], arguments[2]);
+        """
+        css_info = await page.evaluate(script, params["selector"], params["properties"], params["check_accessibility"])
+        
+        # Close the page
+        await page.close()
+        
+        return {
+            "success": True,
+            "url": params["url"],
+            "selector": params["selector"],
+            "elements": css_info,
+            "count": len(css_info)
+        }
+    except Exception as e:
+        logger.error(f"Error analyzing CSS: {e}")
+        return {"error": str(e)}
 
 async def shutdown_gracefully():
     """Shutdown the application gracefully"""
