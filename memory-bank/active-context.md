@@ -30,14 +30,12 @@ We are currently implementing the core API functionality for the MCP Browser pro
    - Image format (PNG/JPEG) and quality options
    - Navigation timing control
 
-4. **Implemented DOM Extraction API**: Added a new API endpoint `/api/dom/extract` that provides DOM analysis capabilities:
-   - Element selection with CSS selectors
-   - Detailed DOM structure extraction
-   - Optional computed styles inclusion
-   - Element attributes extraction
-   - Visibility and bounding box information
+4. **Fixed DOM Extraction API**: Fixed the DOM extraction API by correctly implementing the Playwright page.evaluate() method
+5. **Added appropriate JS function structure with arrow functions**: Added appropriate JS function structure with arrow functions
+6. **Implemented proper passing of parameters to the JS functions**: Implemented proper passing of parameters to the JS functions
+7. **Successfully verified all API endpoints are working with the test script**: Successfully verified all API endpoints are working with the test script
 
-5. **Created Feature Implementation Plan**: Developed a detailed implementation plan for the MCP Browser features in `mcp-browser-features.md` that includes:
+8. **Created Feature Implementation Plan**: Developed a detailed implementation plan for the MCP Browser features in `mcp-browser-features.md` that includes:
    - API designs for frontend analysis capabilities
    - MCP protocol extension specifications
    - Verification agent integration plans
@@ -45,13 +43,13 @@ We are currently implementing the core API functionality for the MCP Browser pro
    - Developer experience enhancements
    - Security improvement strategies
 
-6. **Updated Docker Configuration**: Modified the Docker Compose file to reference environment variables for better configurability and security.
+9. **Updated Docker Configuration**: Modified the Docker Compose file to reference environment variables for better configurability and security.
 
-7. **Created Environment Configuration**: Added `.env.example` file to guide users on setting up the required environment variables.
+10. **Created Environment Configuration**: Added `.env.example` file to guide users on setting up the required environment variables.
 
-8. **Enhanced Build Scripts**: Improved the run script to handle environment files and provide better error messages.
+11. **Enhanced Build Scripts**: Improved the run script to handle environment files and provide better error messages.
 
-9. **Established Memory Bank**: Created core documentation files to maintain project knowledge and track progress.
+12. **Established Memory Bank**: Created core documentation files to maintain project knowledge and track progress.
 
 ## Next Steps
 
@@ -78,7 +76,7 @@ We are currently implementing the core API functionality for the MCP Browser pro
 
 6. **Create CI/CD Pipeline**: Establish a continuous integration and continuous deployment pipeline for the MCP Browser.
 
-## Active Decisions/Considerations
+## Active Decisions
 
 1. **API Design**: The RESTful API approach with WebSocket support is working well. Continuing with this pattern for remaining endpoints.
 
@@ -95,6 +93,10 @@ We are currently implementing the core API functionality for the MCP Browser pro
 7. **Monitoring Strategy**: Evaluating monitoring tools and approaches, with a focus on real-time metrics, log aggregation, and alerting.
 
 8. **Developer Experience**: Considering approaches to enhance developer experience, including API documentation, CLI tools, and example scripts.
+
+9. **Decided to use f-strings to inject parameters directly into JavaScript functions to avoid complications with parameter passing in Playwright's evaluate method**: Decided to use f-strings to inject parameters directly into JavaScript functions to avoid complications with parameter passing in Playwright's evaluate method
+10. **Using a minimalistic approach for API endpoint validation and error handling**: Using a minimalistic approach for API endpoint validation and error handling
+11. **Focusing on core browser analysis functionality before implementing MCP protocol extensions**: Focusing on core browser analysis functionality before implementing MCP protocol extensions
 
 ## Current Blockers
 
