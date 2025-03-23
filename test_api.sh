@@ -10,6 +10,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 mkdir -p "$SCRIPT_DIR/output/screenshots"
 mkdir -p "$SCRIPT_DIR/output/dom"
 mkdir -p "$SCRIPT_DIR/output/css"
+mkdir -p "$SCRIPT_DIR/output/accessibility"
+mkdir -p "$SCRIPT_DIR/output/responsive"
 
 # Check if the server is running
 if ! curl -s "http://localhost:7665/api/status" > /dev/null; then

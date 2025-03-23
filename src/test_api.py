@@ -144,72 +144,173 @@ def test_css_analysis():
     log_message("Testing CSS analysis API...")
     
     # Test parameters
-    test_url = "https://example.com"
-    selector = "p"  # Example.com has paragraphs
-    properties = ["color", "font-size", "margin", "padding"]
+    url = "https://example.com"
+    selector = "p"
     check_accessibility = True
     
     try:
+        # Make the API call
         response = requests.post(
             f"{API_BASE_URL}/api/css/analyze",
+            params={"url": url, "selector": selector, "check_accessibility": check_accessibility}
+        )
+        
+        # Check response
+        if response.status_code == 200:
+            css_data = response.json()
+            log_message(f"CSS analysis successful")
+            
+            # Save the response to file
+            timestamp = int(time.time())
+            output_file = os.path.join(CSS_DIR, f"css_analysis_{timestamp}.json")
+            
+            with open(output_file, "w") as f:
+                json.dump(css_data, f, indent=2)
+                
+            log_message(f"CSS analysis data saved to {output_file}")
+            return True
+        else:
+            log_message(f"CSS analysis failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        log_message(f"Error testing CSS analysis API: {e}")
+        return False
+
+def test_accessibility():
+    """Test the accessibility testing API"""
+    log_message("Testing accessibility testing API...")
+    
+    # Test parameters
+    url = "https://example.com"
+    standard = "wcag2aa"
+    include_html = True
+    include_warnings = True
+    
+    try:
+        # Make the API call
+        response = requests.post(
+            f"{API_BASE_URL}/api/accessibility/test",
             params={
-                "url": test_url,
-                "selector": selector,
-                "check_accessibility": check_accessibility
-            },
-            json={
-                "properties": properties
+                "url": url, 
+                "standard": standard, 
+                "include_html": include_html,
+                "include_warnings": include_warnings
             }
         )
         
+        # Check response
         if response.status_code == 200:
-            result = response.json()
-            if result.get("success"):
-                # Save the CSS analysis to a file for verification
-                if "elements" in result:
-                    timestamp = int(time.time())
-                    filename = f"css_analysis_{timestamp}.json"
-                    filepath = os.path.join(CSS_DIR, filename)
-                    
-                    with open(filepath, "w") as f:
-                        json.dump(result, f, indent=2)
-                    
-                    log_message(f"CSS analysis saved to {filepath}")
-                    return True
-                else:
-                    log_message("CSS data missing from response")
-                    return False
-            else:
-                log_message(f"CSS analysis failed: {result.get('error', 'Unknown error')}")
-                return False
+            accessibility_data = response.json()
+            log_message(f"Accessibility testing successful")
+            
+            # Save the response to file
+            timestamp = int(time.time())
+            output_dir = os.path.join(OUTPUT_DIR, "accessibility")
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"accessibility_test_{timestamp}.json")
+            
+            with open(output_file, "w") as f:
+                json.dump(accessibility_data, f, indent=2)
+                
+            log_message(f"Accessibility test data saved to {output_file}")
+            return True
         else:
-            log_message(f"API request failed: {response.status_code} - {response.text}")
+            log_message(f"Accessibility testing failed: {response.status_code} - {response.text}")
             return False
     except Exception as e:
-        log_message(f"Error testing CSS analysis: {e}")
+        log_message(f"Error testing accessibility API: {e}")
+        return False
+
+def test_responsive():
+    """Test the responsive design testing API"""
+    log_message("Testing responsive design testing API...")
+    
+    # Test parameters
+    url = "https://example.com"
+    viewports = [
+        {"width": 375, "height": 667},  # Mobile
+        {"width": 1366, "height": 768}  # Laptop
+    ]
+    selectors = ["h1", "p"]
+    
+    try:
+        # Make the API call
+        response = requests.post(
+            f"{API_BASE_URL}/api/responsive/test",
+            params={
+                "url": url,
+                "include_screenshots": True,
+                "compare_elements": True
+            },
+            json={
+                "viewports": viewports,
+                "selectors": selectors
+            }
+        )
+        
+        # Check response
+        if response.status_code == 200:
+            responsive_data = response.json()
+            log_message(f"Responsive design testing successful")
+            
+            # Save the response to file
+            timestamp = int(time.time())
+            output_dir = os.path.join(OUTPUT_DIR, "responsive")
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"responsive_test_summary_{timestamp}.json")
+            
+            with open(output_file, "w") as f:
+                json.dump(responsive_data, f, indent=2)
+                
+            log_message(f"Responsive test data saved to {output_file}")
+            return True
+        else:
+            log_message(f"Responsive design testing failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        log_message(f"Error testing responsive design API: {e}")
         return False
 
 def run_tests():
-    """Run all tests"""
-    log_message("Starting API tests...")
-    
-    # Check if API is running
+    """Run all the API tests"""
+    # Check if the API is running
     if not check_api_status():
-        log_message("API is not running or not responding. Aborting tests.")
-        return False
+        log_message("API is not running. Exiting.")
+        sys.exit(1)
+    
+    # Keep track of test results
+    test_results = {
+        "screenshot_capture": None,
+        "dom_extraction": None,
+        "css_analysis": None,
+        "accessibility_testing": None,
+        "responsive_testing": None
+    }
     
     # Run tests
-    screenshot_result = test_screenshot_capture()
-    dom_result = test_dom_extraction()
-    css_result = test_css_analysis()
+    test_results["screenshot_capture"] = test_screenshot_capture()
+    test_results["dom_extraction"] = test_dom_extraction()
+    test_results["css_analysis"] = test_css_analysis()
+    test_results["accessibility_testing"] = test_accessibility()
+    test_results["responsive_testing"] = test_responsive()
     
     # Report results
-    log_message("\nTest Results:")
-    log_message(f"- Screenshot Capture: {'PASS' if screenshot_result else 'FAIL'}")
-    log_message(f"- DOM Extraction: {'PASS' if dom_result else 'FAIL'}")
-    log_message(f"- CSS Analysis: {'PASS' if css_result else 'FAIL'}")
+    log_message("\n--- Test Results ---")
+    all_passed = True
     
-    return screenshot_result and dom_result and css_result
+    for test_name, result in test_results.items():
+        status = "PASSED" if result else "FAILED"
+        log_message(f"{test_name}: {status}")
+        if not result:
+            all_passed = False
+    
+    # Exit with appropriate status code
+    if all_passed:
+        log_message("All tests passed!")
+        sys.exit(0)
+    else:
+        log_message("Some tests failed. Check the logs for details.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     success = run_tests()

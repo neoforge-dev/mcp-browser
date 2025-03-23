@@ -11,13 +11,14 @@ import yaml
 import json
 import requests
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Body, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from playwright.async_api import async_playwright
 import uvicorn
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -119,6 +120,26 @@ class CssAnalysisRequest(BaseModel):
     selector: str
     properties: Optional[List[str]] = None
     check_accessibility: bool = False
+
+class AccessibilityTestRequest(BaseModel):
+    url: str
+    standard: str = "wcag2aa"  # Default to WCAG 2.0 AA
+    include_html: bool = True
+    selectors: Optional[List[str]] = None
+    include_warnings: bool = True
+
+class ResponsiveTestRequest(BaseModel):
+    url: str
+    viewports: List[Dict[str, int]] = [
+        {"width": 375, "height": 667},   # Mobile
+        {"width": 768, "height": 1024},  # Tablet
+        {"width": 1366, "height": 768},  # Laptop
+        {"width": 1920, "height": 1080}  # Desktop
+    ]
+    compare_elements: bool = True
+    include_screenshots: bool = True
+    selectors: Optional[List[str]] = None
+    waiting_time: Optional[int] = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -785,6 +806,416 @@ async def analyze_css(
     except Exception as e:
         logger.error(f"Error analyzing CSS: {e}")
         return {"error": str(e)}
+
+@app.post("/api/accessibility/test")
+async def test_accessibility(
+    request: Optional[AccessibilityTestRequest] = None,
+    url: Optional[str] = Query(None),
+    standard: str = Query("wcag2aa"),
+    include_html: bool = Query(True),
+    include_warnings: bool = Query(True),
+    selectors: Optional[List[str]] = Body(None)
+):
+    """Test a web page for accessibility issues"""
+    global browser_context
+    
+    # Handle both request body and query parameters
+    if request is not None:
+        url = request.url
+        standard = request.standard
+        include_html = request.include_html
+        include_warnings = request.include_warnings
+        selectors = request.selectors
+    
+    if not url:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "URL is required"}
+        )
+    
+    if HEADLESS_MODE:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Browser features are disabled in headless mode"}
+        )
+    
+    if not browser_context:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Browser is not initialized"}
+        )
+    
+    # Valid standards
+    valid_standards = ["wcag2a", "wcag2aa", "wcag2aaa", "wcag21aa", "section508"]
+    if standard not in valid_standards:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid standard. Valid options are: {', '.join(valid_standards)}"}
+        )
+    
+    # Set up the timestamp for output files
+    timestamp = int(time.time())
+    output_file = f"output/accessibility_test_{timestamp}.json"
+    
+    try:
+        # Create a new page
+        page = await browser_context.new_page()
+        
+        try:
+            # Navigate to the page
+            logger.info(f"Navigating to {url} for accessibility testing")
+            await page.goto(url, wait_until="networkidle")
+            
+            # Run accessibility audit with axe-core
+            # This JavaScript function uses axe-core to perform accessibility checks
+            accessibility_results = await page.evaluate(f"""
+            async () => {{
+                // Inject axe-core library if not already present
+                if (!window.axe) {{
+                    const axeSource = await fetch(
+                        'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.7.0/axe.min.js'
+                    ).then(response => response.text());
+                    
+                    const scriptElement = document.createElement('script');
+                    scriptElement.textContent = axeSource;
+                    document.head.appendChild(scriptElement);
+                    
+                    // Wait for axe to be fully loaded
+                    await new Promise(resolve => {{
+                        if (window.axe) {{
+                            resolve();
+                        }} else {{
+                            scriptElement.onload = resolve;
+                        }}
+                    }});
+                }}
+                
+                // Configure the axe options
+                const options = {{
+                    runOnly: {{
+                        type: 'tag',
+                        values: ['{standard}']
+                    }},
+                    resultTypes: ['violations', 'incomplete'],
+                    elementRef: {str(include_html).lower()},
+                    selectors: {json.dumps(selectors) if selectors else 'false'}
+                }};
+                
+                if ({str(include_warnings).lower()}) {{
+                    options.resultTypes.push('warnings');
+                }}
+                
+                // Run the accessibility audit
+                return await axe.run(document, options);
+            }}
+            """)
+            
+            # Process the results
+            if accessibility_results:
+                # Save results to file
+                os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                
+                with open(output_file, "w") as f:
+                    json.dump(accessibility_results, f, indent=2)
+                
+                # Prepare the response
+                response = {
+                    "url": url,
+                    "timestamp": timestamp,
+                    "standard": standard,
+                    "results": accessibility_results,
+                    "output_file": output_file
+                }
+                
+                return response
+            else:
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "Failed to retrieve accessibility results"}
+                )
+                
+        except Exception as e:
+            logger.error(f"Error testing accessibility: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Error testing accessibility: {str(e)}"}
+            )
+        finally:
+            # Close the page to free resources
+            await page.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating browser page: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error creating browser page: {str(e)}"}
+        )
+
+@app.post("/api/responsive/test")
+async def test_responsive(
+    request: Optional[ResponsiveTestRequest] = None,
+    url: Optional[str] = Query(None),
+    include_screenshots: bool = Query(True),
+    compare_elements: bool = Query(True),
+    waiting_time: Optional[int] = Query(None),
+    viewports: Optional[List[Dict[str, int]]] = Body(None),
+    selectors: Optional[List[str]] = Body(None)
+):
+    """Test a web page across different viewport sizes to analyze responsive behavior"""
+    global browser_context
+    
+    # Handle both request body and query parameters
+    if request is not None:
+        url = request.url
+        include_screenshots = request.include_screenshots
+        compare_elements = request.compare_elements
+        waiting_time = request.waiting_time
+        viewports = request.viewports
+        selectors = request.selectors
+    
+    if not url:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "URL is required"}
+        )
+    
+    if HEADLESS_MODE:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Browser features are disabled in headless mode"}
+        )
+    
+    if not browser_context:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Browser is not initialized"}
+        )
+    
+    # Default viewports if not provided
+    if not viewports:
+        viewports = [
+            {"width": 375, "height": 667},   # Mobile
+            {"width": 768, "height": 1024},  # Tablet
+            {"width": 1366, "height": 768},  # Laptop
+            {"width": 1920, "height": 1080}  # Desktop
+        ]
+    
+    # Set up the timestamp for output files
+    timestamp = int(time.time())
+    output_dir = f"output/responsive/{timestamp}"
+    os.makedirs(output_dir, exist_ok=True)
+    results_file = f"{output_dir}/responsive_test_{timestamp}.json"
+    
+    results = {
+        "url": url,
+        "timestamp": timestamp,
+        "viewports": viewports,
+        "viewport_results": [],
+        "element_comparison": None,
+        "output_directory": output_dir
+    }
+    
+    try:
+        # We'll create a new page for each viewport to ensure a clean test
+        for i, viewport in enumerate(viewports):
+            viewport_name = f"{viewport['width']}x{viewport['height']}"
+            logger.info(f"Testing {url} at viewport {viewport_name}")
+            
+            # Create a new page with the specified viewport
+            page = await browser_context.new_page()
+            await page.set_viewport_size(viewport)
+            
+            try:
+                # Navigate to the URL
+                await page.goto(url, wait_until="networkidle")
+                
+                # Wait additional time if specified
+                if waiting_time:
+                    await asyncio.sleep(waiting_time / 1000)  # Convert to seconds
+                
+                # Capture a screenshot if requested
+                screenshot_path = None
+                if include_screenshots:
+                    screenshot_path = f"{output_dir}/screenshot_{viewport_name}.png"
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                
+                # Extract element metrics if specified
+                elements_data = None
+                if selectors:
+                    # Extract information about the specified elements
+                    selectors_json = json.dumps(selectors)
+                    elements_data = await page.evaluate(f"""
+                    () => {{
+                        const selectors = {selectors_json};
+                        return selectors.map(selector => {{
+                            const elements = Array.from(document.querySelectorAll(selector));
+                            return {{
+                                selector: selector,
+                                count: elements.length,
+                                elements: elements.map(el => {{
+                                    const rect = el.getBoundingClientRect();
+                                    return {{
+                                        tagName: el.tagName.toLowerCase(),
+                                        id: el.id || null,
+                                        classes: Array.from(el.classList),
+                                        boundingBox: {{
+                                            x: rect.x,
+                                            y: rect.y,
+                                            width: rect.width,
+                                            height: rect.height,
+                                            top: rect.top,
+                                            right: rect.right,
+                                            bottom: rect.bottom,
+                                            left: rect.left
+                                        }},
+                                        isVisible: rect.width > 0 && rect.height > 0 && 
+                                                   window.getComputedStyle(el).display !== 'none' && 
+                                                   window.getComputedStyle(el).visibility !== 'hidden',
+                                        computedStyle: {{
+                                            display: window.getComputedStyle(el).display,
+                                            position: window.getComputedStyle(el).position,
+                                            float: window.getComputedStyle(el).float,
+                                            flexbox: window.getComputedStyle(el).flex !== '',
+                                            grid: window.getComputedStyle(el).display.includes('grid'),
+                                            media: window.matchMedia(`(max-width: ${{window.innerWidth}}px)`).matches
+                                        }}
+                                    }};
+                                }})
+                            }};
+                        }});
+                    }}
+                    """)
+                
+                # Extract overall page metrics
+                page_metrics = await page.evaluate("""
+                () => {
+                    return {
+                        documentWidth: document.documentElement.scrollWidth,
+                        documentHeight: document.documentElement.scrollHeight,
+                        viewportWidth: window.innerWidth,
+                        viewportHeight: window.innerHeight,
+                        mediaQueries: Array.from(document.styleSheets)
+                            .filter(sheet => {
+                                try {
+                                    return sheet.cssRules;
+                                } catch (e) {
+                                    return false;
+                                }
+                            })
+                            .flatMap(sheet => Array.from(sheet.cssRules))
+                            .filter(rule => rule.type === CSSRule.MEDIA_RULE)
+                            .map(rule => rule.conditionText || rule.media.mediaText)
+                            .filter(text => text.includes('width') || text.includes('height'))
+                            .filter((text, index, self) => self.indexOf(text) === index),
+                        horizontalScrollPresent: document.documentElement.scrollWidth > window.innerWidth,
+                        textOverflows: Array.from(document.querySelectorAll('*'))
+                            .filter(el => {
+                                const style = window.getComputedStyle(el);
+                                return el.scrollWidth > el.clientWidth && 
+                                       style.overflow === 'hidden' && 
+                                       style.textOverflow === 'ellipsis' &&
+                                       el.textContent.trim().length > 0;
+                            }).length,
+                        touchTargetSizes: Array.from(document.querySelectorAll('button, a, [role="button"], input, select, textarea'))
+                            .filter(el => {
+                                const rect = el.getBoundingClientRect();
+                                return rect.width > 0 && rect.height > 0 && (rect.width < 44 || rect.height < 44);
+                            }).length
+                    };
+                }
+                """)
+                
+                # Add the results for this viewport
+                viewport_result = {
+                    "viewport": viewport,
+                    "viewport_name": viewport_name,
+                    "page_metrics": page_metrics,
+                    "elements_data": elements_data,
+                    "screenshot_path": screenshot_path
+                }
+                
+                results["viewport_results"].append(viewport_result)
+                
+            except Exception as e:
+                logger.error(f"Error testing viewport {viewport_name}: {e}")
+                results["viewport_results"].append({
+                    "viewport": viewport,
+                    "viewport_name": viewport_name,
+                    "error": str(e)
+                })
+            finally:
+                # Close the page
+                await page.close()
+        
+        # Perform element comparison across viewports if requested
+        if compare_elements and selectors and len(results["viewport_results"]) > 1:
+            # Extract element data from each viewport
+            viewport_elements = {}
+            for viewport_result in results["viewport_results"]:
+                if "elements_data" in viewport_result and viewport_result["elements_data"]:
+                    viewport_elements[viewport_result["viewport_name"]] = viewport_result["elements_data"]
+            
+            # Compare elements across viewports
+            element_comparison = {}
+            for selector_index, selector in enumerate(selectors):
+                selector_comparison = {
+                    "selector": selector,
+                    "differences": [],
+                    "responsive_issues": []
+                }
+                
+                # Check for differences in element counts
+                element_counts = {}
+                for viewport_name, elements_data in viewport_elements.items():
+                    if selector_index < len(elements_data):
+                        element_counts[viewport_name] = elements_data[selector_index]["count"]
+                
+                if len(set(element_counts.values())) > 1:
+                    selector_comparison["differences"].append({
+                        "type": "element_count",
+                        "description": "Element count varies across viewports",
+                        "counts": element_counts
+                    })
+                
+                # Check for visibility changes
+                for viewport_name, elements_data in viewport_elements.items():
+                    if selector_index < len(elements_data):
+                        selector_data = elements_data[selector_index]
+                        for element_index, element in enumerate(selector_data["elements"]):
+                            # Create a key for this specific element
+                            element_key = f"{selector}-{element_index}"
+                            
+                            # Check if this element is in all viewports
+                            all_viewport_visibility = {}
+                            for vp_name, vp_elements in viewport_elements.items():
+                                if selector_index < len(vp_elements) and element_index < len(vp_elements[selector_index]["elements"]):
+                                    all_viewport_visibility[vp_name] = vp_elements[selector_index]["elements"][element_index]["isVisible"]
+                            
+                            # If visibility changes across viewports, it might be responsive behavior
+                            if len(set(all_viewport_visibility.values())) > 1:
+                                selector_comparison["responsive_issues"].append({
+                                    "element_key": element_key,
+                                    "issue": "visibility_change",
+                                    "description": "Element visibility changes across viewports",
+                                    "visibility": all_viewport_visibility
+                                })
+                
+                element_comparison[selector] = selector_comparison
+            
+            results["element_comparison"] = element_comparison
+        
+        # Save results to file
+        with open(results_file, "w") as f:
+            json.dump(results, f, indent=2)
+        
+        return results
+            
+    except Exception as e:
+        logger.error(f"Error in responsive testing: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Error in responsive testing: {str(e)}"}
+        )
 
 async def shutdown_gracefully():
     """Shutdown the application gracefully"""
