@@ -514,99 +514,113 @@ async def extract_dom(
                 return {"error": f"Selector not found: {params['selector']}"}
                 
             # Extract DOM information for the selected elements
-            script = """
-            function extractDomInfo(selector, includeStyles, includeAttributes) {
+            selector_js = params["selector"]
+            include_styles_js = params["include_styles"]
+            include_attributes_js = params["include_attributes"]
+            
+            script = f"""
+            () => {{
+                const selector = '{selector_js}';
+                const includeStyles = {str(include_styles_js).lower()};
+                const includeAttributes = {str(include_attributes_js).lower()};
+                
                 const elements = Array.from(document.querySelectorAll(selector));
-                return elements.map(el => {
+                return elements.map(el => {{
                     const rect = el.getBoundingClientRect();
-                    const result = {
+                    const result = {{
                         tagName: el.tagName.toLowerCase(),
                         textContent: el.textContent.trim(),
                         isVisible: rect.width > 0 && rect.height > 0,
-                        boundingBox: {
+                        boundingBox: {{
                             x: rect.x,
                             y: rect.y,
                             width: rect.width,
                             height: rect.height
-                        },
+                        }},
                         innerHTML: el.innerHTML
-                    };
+                    }};
                     
-                    if (includeAttributes) {
-                        result.attributes = {};
-                        Array.from(el.attributes).forEach(attr => {
+                    if (includeAttributes) {{
+                        result.attributes = {{}};
+                        Array.from(el.attributes).forEach(attr => {{
                             result.attributes[attr.name] = attr.value;
-                        });
-                    }
+                        }});
+                    }}
                     
-                    if (includeStyles) {
-                        result.styles = {};
+                    if (includeStyles) {{
+                        result.styles = {{}};
                         const computedStyle = window.getComputedStyle(el);
-                        for (let i = 0; i < computedStyle.length; i++) {
+                        for (let i = 0; i < computedStyle.length; i++) {{
                             const prop = computedStyle[i];
                             result.styles[prop] = computedStyle.getPropertyValue(prop);
-                        }
-                    }
+                        }}
+                    }}
                     
                     return result;
-                });
-            }
-            return extractDomInfo(arguments[0], arguments[1], arguments[2]);
+                }});
+            }}
             """
-            dom_info = await page.evaluate(script, params["selector"], params["include_styles"], params["include_attributes"])
+            # Pass the script without additional parameters
+            dom_info = await page.evaluate(script)
         else:
             # Extract entire DOM structure
-            script = """
-            function processFullDom(includeStyles, includeAttributes) {
-                function processNode(node) {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        return {
+            include_styles_js = params["include_styles"]
+            include_attributes_js = params["include_attributes"]
+            
+            script = f"""
+            () => {{
+                const includeStyles = {str(include_styles_js).lower()};
+                const includeAttributes = {str(include_attributes_js).lower()};
+                
+                function processNode(node) {{
+                    if (node.nodeType === Node.TEXT_NODE) {{
+                        return {{
                             type: 'text',
                             content: node.textContent.trim()
-                        };
-                    }
+                        }};
+                    }}
                     
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const result = {
+                    if (node.nodeType === Node.ELEMENT_NODE) {{
+                        const result = {{
                             type: 'element',
                             tagName: node.tagName.toLowerCase(),
-                            children: Array.from(node.childNodes).map(processNode).filter(n => {
+                            children: Array.from(node.childNodes).map(processNode).filter(n => {{
                                 // Filter out empty text nodes
                                 return !(n.type === 'text' && n.content === '');
-                            })
-                        };
+                            }})
+                        }};
                         
-                        if (includeAttributes) {
-                            result.attributes = {};
-                            Array.from(node.attributes).forEach(attr => {
+                        if (includeAttributes) {{
+                            result.attributes = {{}};
+                            Array.from(node.attributes).forEach(attr => {{
                                 result.attributes[attr.name] = attr.value;
-                            });
-                        }
+                            }});
+                        }}
                         
-                        if (includeStyles) {
-                            result.styles = {};
+                        if (includeStyles) {{
+                            result.styles = {{}};
                             const computedStyle = window.getComputedStyle(node);
                             // Include only the most relevant styles to avoid huge output
                             const relevantStyles = [
                                 'display', 'position', 'width', 'height', 'margin', 'padding',
                                 'color', 'background-color', 'font-size', 'font-family'
                             ];
-                            relevantStyles.forEach(prop => {
+                            relevantStyles.forEach(prop => {{
                                 result.styles[prop] = computedStyle.getPropertyValue(prop);
-                            });
-                        }
+                            }});
+                        }}
                         
                         return result;
-                    }
+                    }}
                     
                     return null;
-                }
+                }}
                 
                 return processNode(document.documentElement);
-            }
-            return processFullDom(arguments[0], arguments[1]);
+            }}
             """
-            dom_info = await page.evaluate(script, params["include_styles"], params["include_attributes"])
+            # Pass the script without additional parameters
+            dom_info = await page.evaluate(script)
         
         # Close the page
         await page.close()
@@ -687,65 +701,76 @@ async def analyze_css(
             ]
             
         # Extract CSS information for the selected elements
-        script = """
-        function analyzeCss(selector, properties, checkAccessibility) {
+        selector_js = params["selector"]
+        properties_js = params["properties"] or []
+        check_accessibility_js = params["check_accessibility"]
+        
+        # Convert properties list to JavaScript array string
+        properties_js_str = json.dumps(properties_js)
+        
+        script = f"""
+        () => {{
+            const selector = '{selector_js}';
+            const properties = {properties_js_str};
+            const checkAccessibility = {str(check_accessibility_js).lower()};
+            
             const elements = Array.from(document.querySelectorAll(selector));
-            const results = elements.map(el => {
+            const results = elements.map(el => {{
                 const computedStyle = window.getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
                 
                 // Basic element info
-                const result = {
+                const result = {{
                     tagName: el.tagName.toLowerCase(),
                     textContent: el.textContent.trim(),
                     isVisible: rect.width > 0 && rect.height > 0,
-                    boundingBox: {
+                    boundingBox: {{
                         x: rect.x,
                         y: rect.y,
                         width: rect.width,
                         height: rect.height
-                    },
-                    styles: {}
-                };
+                    }},
+                    styles: {{}}
+                }};
                 
                 // Get the requested CSS properties
-                properties.forEach(prop => {
+                properties.forEach(prop => {{
                     result.styles[prop] = computedStyle.getPropertyValue(prop);
-                });
+                }});
                 
                 // If accessibility checks are requested
-                if (checkAccessibility) {
-                    result.accessibility = {
+                if (checkAccessibility) {{
+                    result.accessibility = {{
                         colorContrast: null,  // Will be filled in below if possible
                         hasAltText: null,
                         hasAriaLabel: Boolean(el.getAttribute('aria-label')),
                         isFocusable: el.tabIndex >= 0
-                    };
+                    }};
                     
                     // Check for alt text on images
-                    if (el.tagName.toLowerCase() === 'img') {
+                    if (el.tagName.toLowerCase() === 'img') {{
                         result.accessibility.hasAltText = Boolean(el.getAttribute('alt'));
-                    }
+                    }}
                     
                     // Color contrast calculation (simplified version)
                     const bgColor = computedStyle.getPropertyValue('background-color');
                     const textColor = computedStyle.getPropertyValue('color');
-                    if (bgColor && textColor) {
+                    if (bgColor && textColor) {{
                         // Here we'd normally calculate contrast ratio
                         // This is simplified to just record the colors for later analysis
                         result.accessibility.backgroundColor = bgColor;
                         result.accessibility.textColor = textColor;
-                    }
-                }
+                    }}
+                }}
                 
                 return result;
-            });
+            }});
             
             return results;
-        }
-        return analyzeCss(arguments[0], arguments[1], arguments[2]);
+        }}
         """
-        css_info = await page.evaluate(script, params["selector"], params["properties"], params["check_accessibility"])
+        # Pass the script without additional parameters
+        css_info = await page.evaluate(script)
         
         # Close the page
         await page.close()
