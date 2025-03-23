@@ -1,0 +1,17 @@
+[project]
+name = "mcp-browser"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bcrypt>=4.3.0",
+    "fastapi>=0.108.0",
+    "mcp[cli]>=1.5.0",
+    "passlib>=1.7.4",
+    "playwright>=1.51.0",
+    "python-jose>=3.4.0",
+    "pyyaml>=6.0",
+    "requests>=2.32.3",
+    "uvicorn[standard]>=0.24.0",
+]
