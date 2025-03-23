@@ -6,6 +6,11 @@ set -e
 # Determine the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Create output directories if they don't exist
+mkdir -p "$SCRIPT_DIR/output/screenshots"
+mkdir -p "$SCRIPT_DIR/output/dom"
+mkdir -p "$SCRIPT_DIR/output/css"
+
 # Check if the server is running
 if ! curl -s "http://localhost:7665/api/status" > /dev/null; then
     echo "Error: MCP Browser server is not running on port 7665."

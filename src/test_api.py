@@ -13,6 +13,17 @@ from datetime import datetime
 # API Base URL - can be overridden by environment variable
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:7665")
 
+# Output directories
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
+SCREENSHOTS_DIR = os.path.join(OUTPUT_DIR, "screenshots")
+DOM_DIR = os.path.join(OUTPUT_DIR, "dom")
+CSS_DIR = os.path.join(OUTPUT_DIR, "css")
+
+# Create output directories if they don't exist
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+os.makedirs(DOM_DIR, exist_ok=True)
+os.makedirs(CSS_DIR, exist_ok=True)
+
 def log_message(msg):
     """Log a message with timestamp"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -62,11 +73,12 @@ def test_screenshot_capture():
                     img_data = base64.b64decode(result["screenshot"])
                     timestamp = int(time.time())
                     filename = f"screenshot_{timestamp}.png"
+                    filepath = os.path.join(SCREENSHOTS_DIR, filename)
                     
-                    with open(filename, "wb") as f:
+                    with open(filepath, "wb") as f:
                         f.write(img_data)
                     
-                    log_message(f"Screenshot saved to {filename}")
+                    log_message(f"Screenshot saved to {filepath}")
                     return True
                 else:
                     log_message("Screenshot data missing from response")
@@ -107,11 +119,12 @@ def test_dom_extraction():
                 if "dom" in result:
                     timestamp = int(time.time())
                     filename = f"dom_extraction_{timestamp}.json"
+                    filepath = os.path.join(DOM_DIR, filename)
                     
-                    with open(filename, "w") as f:
+                    with open(filepath, "w") as f:
                         json.dump(result["dom"], f, indent=2)
                     
-                    log_message(f"DOM extraction saved to {filename}")
+                    log_message(f"DOM extraction saved to {filepath}")
                     return True
                 else:
                     log_message("DOM data missing from response")
@@ -156,11 +169,12 @@ def test_css_analysis():
                 if "elements" in result:
                     timestamp = int(time.time())
                     filename = f"css_analysis_{timestamp}.json"
+                    filepath = os.path.join(CSS_DIR, filename)
                     
-                    with open(filename, "w") as f:
+                    with open(filepath, "w") as f:
                         json.dump(result, f, indent=2)
                     
-                    log_message(f"CSS analysis saved to {filename}")
+                    log_message(f"CSS analysis saved to {filepath}")
                     return True
                 else:
                     log_message("CSS data missing from response")
