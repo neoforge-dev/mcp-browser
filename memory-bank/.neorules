@@ -148,3 +148,53 @@
 
 14. **Problem**: API query parameter handling vs body parameter handling
     **Solution**: For GET requests, use query parameters. For POST requests that need both URL and body parameters, support both input methods with clear parameter names 
+
+## WebSocket Event Handling Patterns
+
+1. **Separate Connection Management**: Keep WebSocket connections in separate collections based on their purpose.
+   - `active_connections` for general control connections
+   - `event_connections` for event subscription connections
+
+2. **Unique Identifiers for Subscriptions**: Use unique identifiers for subscriptions with a descriptive prefix (e.g., `sub_` prefix for subscription IDs) to make them easily identifiable.
+
+3. **Event Filtering Architecture**: Implement filtering as a separate function (`_matches_filters`) to allow flexible extension of filtering criteria.
+   - URL pattern matching with regex
+   - Page ID exact matching
+   - Can be extended with additional filter types
+
+4. **Broadcasting Strategy**: Use an async broadcast function that filters events before sending them to clients, avoiding unnecessary processing and network usage.
+
+5. **Event Type Enumeration**: Use Enums for event types and event names to enforce consistency, make code more readable, and enable static checking.
+
+6. **Subscription Handler Pattern**: Use a dictionary of event types to handler functions for dynamic event handling registration and unregistration.
+
+7. **Client Message Structure**: For WebSocket client messages, use an "action" field to distinguish between different operations (subscribe, unsubscribe, list).
+
+8. **Connection and Subscription Lifecycle**: 
+   - Add connections to the active pool on connect
+   - Remove connections and their subscriptions on disconnect
+   - Send confirmation messages for subscription events
+   - Handle errors gracefully with appropriate error messages
+   
+9. **Event Data Structure**: Include consistent fields in all events:
+   - `type`: The event type (PAGE, DOM, CONSOLE, NETWORK)
+   - `event`: Specific event name (e.g., "page.load", "console.error")
+   - `timestamp`: When the event occurred
+   - `data`: Event-specific details
+   - `page_id`: (when applicable) Identifier for the source page
+
+## API Endpoint Conventions
+
+// ... existing code ...
+
+## Response Formats
+
+// ... existing code ...
+
+## Testing and Debugging
+
+// ... existing code ...
+
+## File Organization
+
+// ... existing code ... 

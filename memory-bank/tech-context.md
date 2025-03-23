@@ -221,3 +221,96 @@ The testing framework includes:
 4. **Performance Tests**: Testing response times and resource usage
 
 Test data includes a set of reference websites with known properties. 
+
+## Technologies Used
+
+### Core Technologies
+
+- **Python 3.13+**: Primary programming language
+- **FastAPI**: Web framework for building APIs
+- **Playwright**: Browser automation library
+- **Pydantic**: Data validation and settings management
+- **Uvicorn**: ASGI server implementation
+- **WebSockets**: Protocol for real-time communication
+- **asyncio**: Asynchronous I/O library for concurrent code
+
+### Supporting Libraries
+
+- **websockets**: Python library for WebSocket client/server implementation
+- **uuid**: Library for generating unique identifiers
+- **aiohttp**: Asynchronous HTTP client/server framework
+- **json**: JSON encoding/decoding
+- **httpx**: Fully asynchronous HTTP client
+- **aiofiles**: Asynchronous file operations
+
+### Development Tools
+
+- **uv**: Fast Python package installer
+- **Docker**: Containerization
+- **Xvfb**: Virtual framebuffer for X11 (for headless environments)
+- **pytest**: Testing framework
+- **autopep8**: Code formatter
+
+## Development Setup
+
+The project requires:
+
+1. Python 3.13 or higher
+2. uv for dependency management
+3. Playwright browsers installed
+
+Setup commands:
+```bash
+uv venv .venv
+source .venv/bin/activate
+uv pip install -e .
+python -m playwright install
+```
+
+## Technical Constraints
+
+1. **Browser Compatibility**: The system targets Chromium-based browsers for consistent behavior.
+2. **Memory Usage**: Browser automation is memory-intensive, requiring at least 2GB RAM.
+3. **Event Broadcasting**: WebSocket connections for event subscriptions require consideration for scaling.
+4. **Asynchronous Architecture**: All components must be designed to work in an asynchronous environment.
+
+## Dependencies
+
+### Core Dependencies
+
+```
+fastapi>=0.97.0
+playwright>=1.40.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+websockets>=11.0.3
+```
+
+### Test Dependencies
+
+```
+pytest>=7.0.0
+httpx>=0.24.1
+pytest-asyncio>=0.21.1
+```
+
+## Configuration
+
+Key environment variables:
+- `SERVER_PORT`: Web server port (default: 7665)
+- `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD`: Skip browser download for headless mode
+- `MCP_SECRET`: Secret key for MCP authentication
+
+## Deployment
+
+The application supports:
+1. Local development environment
+2. Docker containerized deployment
+3. Production deployment with appropriate scaling
+
+## Third-Party Integrations
+
+The system is designed to integrate with:
+1. **MCP**: For AI agent communication
+2. **External services**: Via the HTTP API
+3. **Client applications**: Via WebSockets and HTTP API 

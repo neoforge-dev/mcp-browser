@@ -2,6 +2,14 @@
 
 ## System Architecture
 
+The MCP Browser is built as a FastAPI application that acts as a bridge between client applications and a headless browser powered by Playwright. The architecture follows a modular design with several key components:
+
+1. **HTTP API Layer**: REST endpoints for browser control and data extraction
+2. **WebSocket Layer**: Real-time communication for events and interactive sessions
+3. **Browser Control Layer**: Manages browser instances using Playwright
+4. **Error Handling Layer**: Consistent error handling and reporting
+5. **Data Processing Layer**: Processes and formats browser data for clients
+
 ```
 ┌─────────────────┐      ┌──────────────────┐
 │                 │      │                  │
@@ -100,6 +108,53 @@ Secure connection for remote access to the service.
 - Browser instances are created via factory methods
 - Configuration parameters determine browser capabilities
 - Resource management is centralized
+
+### 5. REST API Design
+
+The REST API follows a consistent pattern:
+- Resource-oriented endpoints (e.g., `/api/browser/navigate`, `/api/browser/screenshot`)
+- Query parameters for GET requests
+- JSON bodies for POST requests
+- Consistent response structure with success/error indicators
+
+### 6. WebSocket Event Architecture
+
+The WebSocket event system follows a publish-subscribe pattern:
+1. **Connection Management**: 
+   - Clients connect to the WebSocket endpoint
+   - Connections are stored in a global connection pool
+   - Disconnections clean up associated resources
+
+2. **Subscription Management**:
+   - Clients subscribe to specific event types
+   - Subscriptions are stored with filters and client identifiers
+   - Unsubscribing removes handlers and cleans up resources
+
+3. **Event Broadcasting**:
+   - Events are captured from browser actions
+   - Events are filtered based on subscription criteria
+   - Matching events are sent to subscribed clients
+
+4. **Event Filtering**:
+   - URL pattern matching using regular expressions
+   - Page ID matching for specific page monitoring
+   - Extensible filter mechanism for future criteria
+
+### 7. Browser Control Pattern
+
+The browser control layer follows a facade pattern:
+- Encapsulates complex Playwright interactions
+- Provides a simplified interface for common operations
+- Handles browser lifecycle management
+- Implements error recovery mechanisms
+
+### 8. Error Handling Pattern
+
+All API endpoints follow a consistent error handling approach:
+- Try-except blocks with specific exception types
+- Structured error responses with error codes and messages
+- Detailed logging for debugging
+- Graceful degradation when possible
 
 ## Data Flow
 
@@ -316,3 +371,73 @@ The MCP Browser uses Playwright for browser automation with the following patter
    - Output organization by feature
    - Timestamp-based naming for artifacts
    - Cleanup routines for temporary files 
+
+## Component Relationships
+
+1. **Browser Initialization Flow**:
+   - FastAPI app starts
+   - Playwright browser is launched
+   - Global variables are initialized
+   - API endpoints are registered
+
+2. **Page Management Flow**:
+   - Browser context is created
+   - Pages are created within context
+   - Pages are tracked in a global registry
+   - Events are attached to pages
+
+3. **Event Flow**:
+   - Browser or page events occur
+   - Events are captured by event handlers
+   - Events are processed and formatted
+   - Events are broadcast to subscribed clients
+
+4. **Resource Cleanup Flow**:
+   - WebSocket connections close
+   - Subscriptions are removed
+   - Page resources are released
+   - Browser context is cleaned up when no longer needed
+
+## Data Models
+
+1. **Request Models**:
+   - NavigateRequest: URL and navigation options
+   - ClickRequest: Selector and click options
+   - EvaluateRequest: JavaScript expression and arguments
+
+2. **Response Models**:
+   - StandardResponse: Success indicator and result/error data
+   - ScreenshotResponse: Image data and metadata
+   - ElementDataResponse: Element properties and attributes
+
+3. **Event Models**:
+   - EventType: Enumeration of event categories
+   - EventName: Enumeration of specific event names
+   - EventSubscriptionModel: Subscription details and filters
+   - BrowserEvent: Event data structure for broadcasting
+
+## Technical Decisions
+
+1. **FastAPI for API Framework**:
+   - Asynchronous request handling
+   - Built-in WebSocket support
+   - Automatic OpenAPI documentation
+   - Pydantic integration for request/response validation
+
+2. **Playwright for Browser Automation**:
+   - Cross-browser support
+   - Modern browser capabilities
+   - Powerful selector engine
+   - Asynchronous API design
+
+3. **Asynchronous Architecture**:
+   - Non-blocking I/O for all operations
+   - Efficient handling of multiple concurrent requests
+   - Support for long-running operations
+   - Scalable event broadcasting
+
+4. **JSON for Data Exchange**:
+   - Human-readable for debugging
+   - Compatible with all client technologies
+   - Schema validation with Pydantic
+   - Native browser support for WebSocket communication 
