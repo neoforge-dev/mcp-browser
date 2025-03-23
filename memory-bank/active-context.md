@@ -51,6 +51,17 @@ We are currently implementing the core API functionality for the MCP Browser pro
 
 12. **Established Memory Bank**: Created core documentation files to maintain project knowledge and track progress.
 
+- Organized output files from API endpoints into dedicated folders:
+  - Created `/output/screenshots` for screenshot capture outputs
+  - Created `/output/dom` for DOM extraction data 
+  - Created `/output/css` for CSS analysis results
+- Updated `.gitignore` to exclude output directories from version control
+- Modified test scripts to use the new output directories
+- Fixed the DOM extraction and CSS analysis endpoints by correctly implementing the Playwright page.evaluate() method
+- Added appropriate JS function structure with arrow functions
+- Implemented proper passing of parameters to the JS functions using f-strings
+- Successfully verified all API endpoints are working with the test script
+
 ## Next Steps
 
 1. **Complete Frontend Analysis APIs**: Implement the remaining frontend analysis endpoints:

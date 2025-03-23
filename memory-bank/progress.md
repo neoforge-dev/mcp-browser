@@ -109,6 +109,7 @@ The current focus is on implementing and testing the core browser analysis APIs:
 | Resource Constraints | Current container resource limits may not be optimal | Medium | Need Testing |
 - ~~DOM extraction endpoint failing with Playwright API errors~~ - FIXED
 - ~~CSS analysis endpoint failing with Playwright API errors~~ - FIXED
+- ~~Output files organization~~ - FIXED: All output files now stored in dedicated folders under `/output`
 - Docker image build failing due to issues with Playwright base image
 
 ## Next Major Milestones
