@@ -27,6 +27,9 @@
    - Use page.evaluate sparingly for better performance
    - Manage browser resources carefully (close pages when done)
    - Use stealth mode for more realistic browser behavior
+   - Access browser_context.pages as a property, not a method (no await needed)
+   - Always check if pages exist before accessing them
+   - Handle parameters differently for element methods vs page methods
 
 5. **MCP Protocol Extensions**
    - Follow existing MCP patterns for tool definitions
@@ -34,6 +37,9 @@
    - Use WebSockets for real-time events
    - Include metadata with all responses (timing, etc.)
    - Namespace browser-specific tools appropriately
+   - Use consistent error handling with try/except blocks
+   - Implement proper page navigation and lifecycle management
+   - Use descriptive error messages for easier debugging
 
 ## User Preferences
 
@@ -50,6 +56,8 @@
    - Browser tests run in a similar container environment
    - Mocking external dependencies for unit tests
    - Test coverage target: 80%+
+   - Use test scripts for API endpoint verification
+   - Save test results to output directory for later inspection
 
 3. **Documentation Style**
    - RESTful API documented with OpenAPI
@@ -127,4 +135,16 @@
    **Solution**: Create separate directories for each API output type (screenshots, DOM data, CSS analysis, etc.) and use timestamps in filenames to avoid conflicts
 
 10. **Problem**: Cross-viewport testing
-    **Solution**: Test responsive behavior by rendering the same page at different viewport sizes and comparing element properties and visibility 
+    **Solution**: Test responsive behavior by rendering the same page at different viewport sizes and comparing element properties and visibility
+
+11. **Problem**: browser_context.pages access error "object list can't be used in 'await' expression"
+    **Solution**: Access browser_context.pages as a property, not awaitable method. Use "pages = browser_context.pages" instead of "pages = await browser_context.pages"
+
+12. **Problem**: Element screenshot with full_page parameter error
+    **Solution**: Element screenshots don't support the full_page parameter. Use different parameter sets for page.screenshot() and element.screenshot()
+
+13. **Problem**: Browser page initialization
+    **Solution**: Always check if any pages exist before accessing them. Create a new page if none exist during navigation, handle empty page list gracefully in other endpoints
+
+14. **Problem**: API query parameter handling vs body parameter handling
+    **Solution**: For GET requests, use query parameters. For POST requests that need both URL and body parameters, support both input methods with clear parameter names 
