@@ -98,50 +98,75 @@ async def analyze_css(
     # Implementation
 ```
 
-### 1.4 Accessibility Testing
+### 1.4 Accessibility Analysis
 
 **Implementation Tasks:**
-- Integrate with axe-core or similar accessibility tool
-- Create WCAG compliance checking
-- Implement keyboard navigation testing
-- Add screen reader text extraction
-- Develop color contrast analysis
-- Create focus order verification
+- ✅ Implement accessibility testing API endpoint
+- ✅ Add multiple standards support (WCAG, Section 508)
+- ✅ Create selectors-based testing capability
+- ✅ Add detailed violation reporting
+- ✅ Implement HTML context inclusion for better debugging
+- Add summary report generation
+- Develop custom rule support
 
 **API Design:**
 ```python
-@app.post("/api/accessibility/audit")
-async def audit_accessibility(
+@app.post("/api/accessibility/test")
+async def test_accessibility(
     url: str,
-    standard: str = "WCAG2AA",
-    include_warnings: bool = True
+    standard: str = "wcag2aa",
+    include_html: bool = True,
+    include_warnings: bool = True,
+    selectors: Optional[List[str]] = None
 ):
-    """Perform accessibility audit on a web page"""
+    """Test a web page for accessibility issues"""
+    # Implementation
+```
+
+```python
+@app.post("/api/accessibility/summary")
+async def accessibility_summary(
+    url: str,
+    standards: List[str] = ["wcag2aa"],
+    viewport_sizes: List[Dict[str, int]] = None
+):
+    """Generate a comprehensive accessibility summary across standards and viewport sizes"""
     # Implementation
 ```
 
 ### 1.5 Responsive Design Testing
 
 **Implementation Tasks:**
-- Implement viewport resizing functionality
-- Create device emulation capabilities
-- Develop layout shift detection
-- Add element visibility checking across viewports
-- Implement media query breakpoint analysis
+- ✅ Create viewport size simulation
+- ✅ Implement cross-device testing
+- ✅ Add element visibility checking across viewports
+- ✅ Develop media query detection
+- ✅ Implement touch target size validation
+- ✅ Create comparison mode for detecting responsive differences
+- Add advanced layout shift detection
 
 **API Design:**
 ```python
 @app.post("/api/responsive/test")
 async def test_responsive(
     url: str,
-    viewports: List[Dict[str, int]] = [
-        {"width": 375, "height": 667},  # Mobile
-        {"width": 768, "height": 1024},  # Tablet
-        {"width": 1280, "height": 800},  # Desktop
-    ],
-    check_elements: Optional[List[str]] = None
+    viewports: List[Dict[str, int]] = None,
+    selectors: Optional[List[str]] = None,
+    include_screenshots: bool = True,
+    compare_elements: bool = True
 ):
-    """Test responsive behavior across different viewports"""
+    """Test a web page across different viewport sizes"""
+    # Implementation
+```
+
+```python
+@app.post("/api/responsive/compare")
+async def compare_responsive(
+    url: str,
+    device_presets: List[str] = ["mobile", "tablet", "desktop"],
+    scenarios: List[Dict] = None
+):
+    """Compare a web page across different device presets with custom scenarios"""
     # Implementation
 ```
 

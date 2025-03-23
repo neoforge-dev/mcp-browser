@@ -96,3 +96,128 @@ mcp-browser/
 2. **Container Security**: AppArmor, Non-root user, Resource limits
 3. **Authentication**: JWT tokens, Environment-based secrets
 4. **Browser Isolation**: Xvfb sandboxing, Container isolation 
+
+## Technologies Used
+
+### Core Technologies
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Python | 3.9+ | Primary programming language |
+| FastAPI | 0.95.0+ | Web framework for API development |
+| Uvicorn | 0.22.0+ | ASGI server for FastAPI |
+| Playwright | 1.32.0+ | Browser automation for web page analysis |
+| Docker | 20.10.0+ | Containerization for consistent environments |
+| Xvfb | 1.20.0+ | Virtual framebuffer for headless browser |
+
+### Frontend Analysis Dependencies
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| axe-core | 4.7.0+ | Accessibility testing and standards compliance |
+| PIL (Pillow) | 9.5.0+ | Image processing for screenshots |
+| BeautifulSoup | 4.12.0+ | HTML parsing and DOM operations |
+| pydantic | 1.10.7+ | Data validation and settings management |
+| pytest | 7.3.1+ | Test framework for API validation |
+
+### Support Tools
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| GitHub Actions | N/A | CI/CD platform for automated testing |
+| pre-commit | 3.3.1+ | Git hooks for code quality |
+| black | 23.3.0+ | Code formatting |
+| flake8 | 6.0.0+ | Code linting |
+| mypy | 1.3.0+ | Static type checking |
+
+## Development Environment
+
+### Local Development Setup
+
+1. **Prerequisites**:
+   - Docker and Docker Compose
+   - Python 3.9+
+   - Git
+
+2. **Environment Initialization**:
+   ```bash
+   # Clone repository
+   git clone https://github.com/your-org/mcp-browser.git
+   cd mcp-browser
+   
+   # Build and start Docker containers
+   docker-compose up -d
+   
+   # Run the API server
+   python -m scripts.run
+   ```
+
+3. **Testing Environment**:
+   ```bash
+   # Run tests
+   pytest tests/
+   
+   # Run tests with coverage
+   pytest --cov=app tests/
+   ```
+
+### Docker Environment
+
+The Docker setup includes:
+
+1. **Base Image**: Python 3.9-slim
+2. **Browser Layer**: Playwright browsers installation
+3. **Virtual Display**: Xvfb configuration
+4. **Application Layer**: Application code and dependencies
+5. **Output Volumes**: Mounted volumes for persistent output
+
+The Dockerfile implements multi-stage building to minimize image size.
+
+## API Design
+
+### Request/Response Patterns
+
+All API endpoints follow a consistent pattern:
+
+1. **Request Structure**:
+   - Required parameters: `url` (the target website)
+   - Optional parameters: endpoint-specific configuration
+   - Validation: Pydantic models for type safety
+
+2. **Response Structure**:
+   - Status information
+   - Execution metadata (timing, browser info)
+   - Result data in JSON format
+   - File references for generated artifacts
+
+3. **Error Handling**:
+   - HTTP status codes for error categories
+   - Detailed error messages in response body
+   - Logging for debugging purposes
+
+### API Data Flow
+
+```
+Request → Validation → Browser Setup → Page Navigation → Analysis → Result Processing → Response
+```
+
+### Authentication and Security
+
+Current implementation uses:
+
+1. API keys for basic authentication
+2. Rate limiting by client IP
+3. Input validation for all parameters
+4. Timeout controls for browser operations
+5. Resource limits in Docker container
+
+## Testing Framework
+
+The testing framework includes:
+
+1. **Unit Tests**: Testing individual components and utilities
+2. **Integration Tests**: Testing API endpoints with mock server
+3. **End-to-End Tests**: Testing complete workflows with real websites
+4. **Performance Tests**: Testing response times and resource usage
+
+Test data includes a set of reference websites with known properties. 

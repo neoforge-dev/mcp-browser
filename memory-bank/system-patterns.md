@@ -166,3 +166,153 @@ Secure connection for remote access to the service.
    - No GPU requirements
    - Works on headless servers
    - Long-established stability 
+
+## API Endpoints
+
+### Screenshot Capture API
+
+**Endpoint:** `/api/screenshots/capture`
+
+**Implementation Details:**
+- Uses Playwright's screenshot functionality
+- Supports both viewport and full-page screenshots
+- Image format options: PNG (default) and JPEG with quality settings
+- Configurable viewport dimensions
+- Optional waiting mechanisms (load, networkidle, domcontentloaded)
+- Results stored in `/output/screenshots/` with timestamp-based naming
+
+**Request Parameters:**
+```json
+{
+  "url": "https://example.com",
+  "viewport": {"width": 1280, "height": 800},
+  "fullPage": true,
+  "format": "png",
+  "quality": 90,
+  "waitUntil": "networkidle",
+  "selectors": ["#header", ".main-content"]
+}
+```
+
+### DOM Extraction API
+
+**Endpoint:** `/api/dom/extract`
+
+**Implementation Details:**
+- Implemented using Playwright's page.evaluate() function
+- JavaScript execution in the browser context to extract DOM
+- Supports full page or selector-targeted extraction
+- Optional attribute and style inclusion
+- Format options: HTML source or processed JSON
+- Results stored in `/output/dom/` with timestamp-based naming
+
+**Request Parameters:**
+```json
+{
+  "url": "https://example.com",
+  "selector": "#main-content",
+  "includeAttributes": true,
+  "includeStyles": true,
+  "outputFormat": "json"
+}
+```
+
+### CSS Analysis API
+
+**Endpoint:** `/api/css/analyze`
+
+**Implementation Details:**
+- Uses Playwright for browser automation
+- JavaScript execution to compute styles
+- Optional property filtering
+- Accessibility checks for color contrast
+- Element positioning and visibility information
+- Results stored in `/output/css/` with timestamp-based naming
+
+**Request Parameters:**
+```json
+{
+  "url": "https://example.com",
+  "selectors": [".nav-item", "#main-content h1"],
+  "properties": ["color", "font-size", "background-color"],
+  "includeAccessibility": true,
+  "includePositioning": true
+}
+```
+
+### Accessibility Testing API
+
+**Endpoint:** `/api/accessibility/test`
+
+**Implementation Details:**
+- Integration with axe-core for accessibility testing
+- Multiple standard support (WCAG, Section 508)
+- Selector-based testing capabilities
+- Detailed violation reporting with HTML context
+- Results stored in `/output/accessibility/` with timestamp-based naming
+
+**Request Parameters:**
+```json
+{
+  "url": "https://example.com",
+  "standard": "wcag21aa",
+  "selectors": ["#main-content", "nav"],
+  "includeHtmlContext": true,
+  "tags": ["color-contrast", "aria", "forms"]
+}
+```
+
+### Responsive Design Testing API  
+
+**Endpoint:** `/api/responsive/test`
+
+**Implementation Details:**
+- Multi-viewport testing infrastructure
+- Element comparison across viewport sizes
+- Media query analysis through JavaScript execution
+- Touch target size validation for mobile viewports
+- Screenshot capture at each viewport size
+- Detailed metrics and responsive issue reporting
+- Results stored in `/output/responsive/` with timestamp-based naming
+
+**Request Parameters:**
+```json
+{
+  "url": "https://example.com",
+  "viewports": [
+    {"name": "mobile", "width": 375, "height": 667},
+    {"name": "tablet", "width": 768, "height": 1024},
+    {"name": "desktop", "width": 1440, "height": 900}
+  ],
+  "selectors": [".nav-menu", "#hero-section", ".product-card"],
+  "captureScreenshots": true,
+  "analyzeMediaQueries": true,
+  "checkTouchTargets": true
+}
+```
+
+## Integration Patterns
+
+### Browser Automation
+
+The MCP Browser uses Playwright for browser automation with the following patterns:
+
+1. **Browser Context Management**:
+   - Single browser instance with multiple contexts
+   - Context isolation for security and reliability
+   - Custom viewport and user agent configuration
+
+2. **Page Navigation Flow**:
+   - Standard navigation with timeout and error handling
+   - Wait until options (load, networkidle, domcontentloaded)
+   - Navigation state verification
+
+3. **JavaScript Execution**:
+   - In-browser evaluation for DOM and CSS operations
+   - Serialization of complex objects
+   - Error handling for script execution
+
+4. **Resource Management**:
+   - Output organization by feature
+   - Timestamp-based naming for artifacts
+   - Cleanup routines for temporary files 

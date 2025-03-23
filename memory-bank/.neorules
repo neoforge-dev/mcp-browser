@@ -112,4 +112,19 @@
    **Solution**: Implement ping/pong mechanism to keep connections alive and detect disconnections
 
 5. **Problem**: Resource limits too restrictive
-   **Solution**: Start with conservative limits and monitor actual usage, then adjust accordingly based on real-world metrics 
+   **Solution**: Start with conservative limits and monitor actual usage, then adjust accordingly based on real-world metrics
+
+6. **Problem**: JavaScript booleans in Playwright page.evaluate()
+   **Solution**: Convert Python boolean values (True/False) to JavaScript boolean values (true/false) using str().lower() when injecting into JavaScript code
+
+7. **Problem**: Complex DOM extraction and analysis
+   **Solution**: Use f-strings to inject parameters into JavaScript functions rather than passing them as arguments to Playwright's evaluate method, which can be error-prone for complex structures
+
+8. **Problem**: API testing and verification
+   **Solution**: Create dedicated test endpoints that verify all API functionality, save results to output files, and provide detailed error reporting for easier debugging
+
+9. **Problem**: Output file organization
+   **Solution**: Create separate directories for each API output type (screenshots, DOM data, CSS analysis, etc.) and use timestamps in filenames to avoid conflicts
+
+10. **Problem**: Cross-viewport testing
+    **Solution**: Test responsive behavior by rendering the same page at different viewport sizes and comparing element properties and visibility 
