@@ -10,7 +10,7 @@ import signal
 import yaml
 import json
 import requests
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Body, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Body, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,6 +61,159 @@ class MCPClient:
             logger.error(f"Error sending command to MCP server: {e}")
             return {"error": str(e)}
 
+    # MCP Protocol Extensions for browser operations
+    async def register_tools(self):
+        """Register browser tools with the MCP server"""
+        try:
+            # Browser Navigation Tools
+            await self.register_tool(
+                name="browser_navigate",
+                description="Navigate to a URL in the browser",
+                parameters=[
+                    {"name": "url", "type": "string", "description": "The URL to navigate to", "required": True},
+                    {"name": "wait_until", "type": "string", "description": "Wait until event (load, domcontentloaded, networkidle)", "required": False},
+                    {"name": "timeout", "type": "integer", "description": "Timeout in milliseconds", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_back",
+                description="Navigate back in the browser history",
+                parameters=[
+                    {"name": "wait_until", "type": "string", "description": "Wait until event (load, domcontentloaded, networkidle)", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_forward", 
+                description="Navigate forward in the browser history",
+                parameters=[
+                    {"name": "wait_until", "type": "string", "description": "Wait until event (load, domcontentloaded, networkidle)", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_refresh",
+                description="Refresh the current page",
+                parameters=[
+                    {"name": "wait_until", "type": "string", "description": "Wait until event (load, domcontentloaded, networkidle)", "required": False}
+                ]
+            )
+            
+            # DOM Manipulation Tools
+            await self.register_tool(
+                name="browser_click",
+                description="Click on an element in the page",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element to click", "required": True},
+                    {"name": "wait_for_navigation", "type": "boolean", "description": "Whether to wait for navigation after click", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_type",
+                description="Type text into an element",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element to type into", "required": True},
+                    {"name": "text", "type": "string", "description": "Text to type", "required": True},
+                    {"name": "delay", "type": "integer", "description": "Delay between keypresses in milliseconds", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_select",
+                description="Select an option from a dropdown",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the select element", "required": True},
+                    {"name": "value", "type": "string", "description": "Value to select", "required": True}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_fill_form",
+                description="Fill multiple form fields at once",
+                parameters=[
+                    {"name": "form_data", "type": "object", "description": "Object with selector-value pairs for form fields", "required": True}
+                ]
+            )
+            
+            # Visual Analysis Tools
+            await self.register_tool(
+                name="browser_screenshot",
+                description="Take a screenshot of the current page or element",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element to screenshot (optional)", "required": False},
+                    {"name": "full_page", "type": "boolean", "description": "Whether to take a full page screenshot", "required": False},
+                    {"name": "format", "type": "string", "description": "Image format (png or jpeg)", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_extract_text",
+                description="Extract text content from an element or page",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element (optional)", "required": False}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_check_visibility",
+                description="Check if an element is visible on the page",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element", "required": True}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_wait_for_selector",
+                description="Wait for an element to appear on the page",
+                parameters=[
+                    {"name": "selector", "type": "string", "description": "CSS selector for the element", "required": True},
+                    {"name": "timeout", "type": "integer", "description": "Timeout in milliseconds", "required": False},
+                    {"name": "state", "type": "string", "description": "State to wait for (visible, hidden, attached, detached)", "required": False}
+                ]
+            )
+            
+            # Advanced Browser Tools
+            await self.register_tool(
+                name="browser_evaluate",
+                description="Evaluate JavaScript code in the browser context",
+                parameters=[
+                    {"name": "expression", "type": "string", "description": "JavaScript expression to evaluate", "required": True}
+                ]
+            )
+            
+            await self.register_tool(
+                name="browser_get_url",
+                description="Get the current page URL",
+                parameters=[]
+            )
+            
+            await self.register_tool(
+                name="browser_get_title",
+                description="Get the current page title",
+                parameters=[]
+            )
+            
+            logger.info("Registered browser tools with MCP server")
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error registering browser tools: {e}")
+            return {"error": str(e)}
+    
+    async def register_tool(self, name, description, parameters):
+        """Register a single tool with the MCP server"""
+        try:
+            tool_data = {
+                "name": name,
+                "description": description,
+                "parameters": parameters
+            }
+            return await self.send_command("register_tool", tool_data)
+        except Exception as e:
+            logger.error(f"Error registering tool {name}: {e}")
+            return {"error": str(e)}
+
 # Get MCP Secret from environment
 MCP_SECRET = os.environ.get("MCP_SECRET", "")
 if not MCP_SECRET:
@@ -68,6 +221,11 @@ if not MCP_SECRET:
 
 # Get server port from environment or use default
 SERVER_PORT = int(os.environ.get("SERVER_PORT", "7665"))
+
+# Set output directory
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output"))
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+logger.info(f"Output directory: {OUTPUT_DIR}")
 
 # Check if running in headless mode
 HEADLESS_MODE = os.environ.get("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "0") == "1"
@@ -169,6 +327,11 @@ async def startup_event():
                 server_url="http://localhost:7665",
                 api_key=MCP_SECRET
             )
+            
+            # Register MCP browser tools
+            logger.info("Registering MCP browser tools...")
+            await mcp_client.register_tools()
+            
             logger.info("MCP client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize MCP client: {e}")
@@ -387,9 +550,477 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/api/status")
 async def get_status():
-    """Get the current status of the MCP Browser"""
-    browser_status = "disabled (headless mode)" if HEADLESS_MODE else "running" if browser else "initializing"
-    return {"status": "ok", "browser": browser_status}
+    """Get the status of the service"""
+    return {"status": "ok", "browser": "initialized" if browser else "not_initialized"}
+
+# MCP Browser Tools API Endpoints
+
+# Browser Navigation Tools
+@app.post("/api/browser/navigate")
+async def browser_navigate(
+    url: str,
+    wait_until: str = "networkidle",
+    timeout: int = 30000
+):
+    """Navigate to a URL in the browser"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            # Create a new page if none exists
+            page = await browser_context.new_page()
+        else:
+            page = pages[0]
+        
+        response = await page.goto(url, timeout=timeout, wait_until=wait_until)
+        
+        return {
+            "success": True,
+            "url": page.url,
+            "title": await page.title(),
+            "status": response.status if response else None
+        }
+    except Exception as e:
+        logger.error(f"Error navigating to {url}: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/back")
+async def browser_back(
+    wait_until: str = "networkidle"
+):
+    """Navigate back in the browser history"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        await page.go_back(wait_until=wait_until)
+        
+        return {
+            "success": True,
+            "url": page.url,
+            "title": await page.title()
+        }
+    except Exception as e:
+        logger.error(f"Error navigating back: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/forward")
+async def browser_forward(
+    wait_until: str = "networkidle"
+):
+    """Navigate forward in the browser history"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        await page.go_forward(wait_until=wait_until)
+        
+        return {
+            "success": True,
+            "url": page.url,
+            "title": await page.title()
+        }
+    except Exception as e:
+        logger.error(f"Error navigating forward: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/refresh")
+async def browser_refresh(
+    wait_until: str = "networkidle"
+):
+    """Refresh the current page"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        await page.reload(wait_until=wait_until)
+        
+        return {
+            "success": True,
+            "url": page.url,
+            "title": await page.title()
+        }
+    except Exception as e:
+        logger.error(f"Error refreshing page: {e}")
+        return {"success": False, "error": str(e)}
+
+# DOM Manipulation Tools
+@app.post("/api/browser/click")
+async def browser_click(
+    selector: str,
+    button: str = "left",
+    delay: int = 0,
+    click_count: int = 1,
+    position_x: Optional[int] = None,
+    position_y: Optional[int] = None,
+    modifiers: Optional[List[str]] = None,
+    force: bool = False,
+    no_wait_after: bool = False,
+    strict: bool = False,
+    timeout: int = 30000
+):
+    """Click on an element in the page"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    position = {"x": position_x, "y": position_y} if position_x is not None and position_y is not None else None
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        await page.click(
+            selector,
+            button=button,
+            delay=delay,
+            click_count=click_count,
+            position=position,
+            modifiers=modifiers,
+            force=force,
+            no_wait_after=no_wait_after,
+            strict=strict,
+            timeout=timeout
+        )
+        return {"success": True, "message": f"Clicked element: {selector}"}
+    except Exception as e:
+        logger.error(f"Error clicking element: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/type")
+async def browser_type(
+    selector: str,
+    text: str,
+    delay: Optional[int] = None
+):
+    """Type text into an element"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        await page.fill(selector, "")  # Clear the field first
+        
+        if delay is not None:
+            await page.type(selector, text, delay=delay)
+        else:
+            await page.type(selector, text)
+        
+        return {
+            "success": True,
+            "selector": selector,
+            "text": text
+        }
+    except Exception as e:
+        logger.error(f"Error typing into element {selector}: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/select")
+async def browser_select(
+    selector: str,
+    value: str
+):
+    """Select an option from a dropdown"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        await page.select_option(selector, value=value)
+        
+        return {
+            "success": True,
+            "selector": selector,
+            "value": value
+        }
+    except Exception as e:
+        logger.error(f"Error selecting option from element {selector}: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/fill_form")
+async def browser_fill_form(
+    form_data: Dict[str, str]
+):
+    """Fill multiple form fields at once"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        results = {}
+        
+        for selector, value in form_data.items():
+            try:
+                await page.fill(selector, value)
+                results[selector] = {"success": True, "value": value}
+            except Exception as e:
+                results[selector] = {"success": False, "error": str(e)}
+        
+        return {
+            "success": True,
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"Error filling form: {e}")
+        return {"success": False, "error": str(e)}
+
+# Visual Analysis Tools
+@app.post("/api/browser/screenshot")
+async def browser_screenshot(
+    selector: Optional[str] = None,
+    full_page: bool = False,
+    quality: Optional[int] = None,
+    omit_background: bool = False,
+    timeout: int = 30000,
+    type: str = "png",
+    path: Optional[str] = None
+):
+    """Take a screenshot of the page or element"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        if not path:
+            # Generate a filename based on timestamp
+            timestamp = int(time.time())
+            filename = f"screenshot_{timestamp}.{type}"
+            path = os.path.join(OUTPUT_DIR, filename)
+        
+        if selector:
+            element = await page.query_selector(selector)
+            if not element:
+                return {"success": False, "error": f"Element not found: {selector}"}
+            
+            # Element screenshots don't support full_page parameter
+            element_screenshot_options = {
+                "path": path,
+                "omit_background": omit_background,
+                "timeout": timeout,
+                "type": type
+            }
+            
+            if quality is not None and type == "jpeg":
+                element_screenshot_options["quality"] = quality
+                
+            await element.screenshot(**element_screenshot_options)
+        else:
+            # Page screenshots can use full_page parameter
+            page_screenshot_options = {
+                "path": path,
+                "full_page": full_page,
+                "omit_background": omit_background,
+                "timeout": timeout,
+                "type": type
+            }
+            
+            if quality is not None and type == "jpeg":
+                page_screenshot_options["quality"] = quality
+                
+            await page.screenshot(**page_screenshot_options)
+        
+        return {
+            "success": True,
+            "path": path,
+            "full_page": full_page if not selector else None,
+            "selector": selector
+        }
+    except Exception as e:
+        logger.error(f"Error taking screenshot: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/extract_text")
+async def browser_extract_text(
+    selector: Optional[str] = None
+):
+    """Extract text content from an element or page"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        if selector:
+            element = await page.query_selector(selector)
+            if not element:
+                return {"success": False, "error": f"Element not found: {selector}"}
+            text = await element.text_content()
+        else:
+            text = await page.content()
+        
+        return {
+            "success": True,
+            "text": text,
+            "selector": selector
+        }
+    except Exception as e:
+        logger.error(f"Error extracting text: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/check_visibility")
+async def browser_check_visibility(
+    selector: str,
+    strict: bool = False,
+    timeout: int = 30000
+):
+    """Check if an element is visible on the page"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        is_visible = await page.is_visible(selector, strict=strict, timeout=timeout)
+        return {"success": True, "visible": is_visible, "selector": selector}
+    except Exception as e:
+        logger.error(f"Error checking visibility: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/wait_for_selector")
+async def browser_wait_for_selector(
+    selector: str,
+    state: str = "visible",
+    strict: bool = False,
+    timeout: int = 30000
+):
+    """Wait for an element to appear on the page"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        element = await page.wait_for_selector(selector, state=state, strict=strict, timeout=timeout)
+        if element:
+            return {"success": True, "selector": selector, "state": state}
+        else:
+            return {"success": False, "error": f"Element not found: {selector}"}
+    except Exception as e:
+        logger.error(f"Error waiting for selector: {e}")
+        return {"success": False, "error": str(e)}
+
+# Advanced Browser Tools
+@app.post("/api/browser/evaluate")
+async def browser_evaluate(
+    expression: str,
+    arg: Optional[str] = None
+):
+    """Evaluate JavaScript expression in the browser"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        
+        if arg:
+            result = await page.evaluate(expression, arg)
+        else:
+            result = await page.evaluate(expression)
+        
+        return {
+            "success": True,
+            "result": result,
+            "expression": expression
+        }
+    except Exception as e:
+        logger.error(f"Error evaluating JavaScript: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/get_url")
+async def browser_get_url():
+    """Get the current page URL"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        url = page.url
+        
+        return {
+            "success": True,
+            "url": url
+        }
+    except Exception as e:
+        logger.error(f"Error getting URL: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/browser/get_title")
+async def browser_get_title():
+    """Get the current page title"""
+    if not browser or not browser_context:
+        raise HTTPException(status_code=500, detail="Browser not initialized")
+    
+    try:
+        pages = browser_context.pages
+        if not pages or len(pages) == 0:
+            return {"success": False, "error": "No browser pages open"}
+        
+        page = pages[0]
+        title = await page.title()
+        
+        return {
+            "success": True,
+            "title": title
+        }
+    except Exception as e:
+        logger.error(f"Error getting title: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/screenshots/capture")
 async def capture_screenshot(
@@ -458,7 +1089,7 @@ async def capture_screenshot(
         
         if params["format"] == "jpeg" and params["quality"] is not None:
             screenshot_options["quality"] = params["quality"]
-            
+        
         screenshot_base64 = await page.screenshot(**screenshot_options)
         
         # Close the page
