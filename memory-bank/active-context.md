@@ -24,6 +24,10 @@ The next phase focuses on:
 - Added event filtering functionality by URL pattern and page ID
 - Created test scripts for WebSocket server and client functionality
 - Documented the WebSocket event feature in WEBSOCKET_EVENTS.md
+- Fixed WebSocket event subscription to handle missing dependencies gracefully
+- Added fallback mechanism for colorama to ensure the test script works without color output
+- Added explicit WebSocket endpoint at `/ws/browser/events` to match client expectations
+- Configured test_mcp_events.sh to work with test WebSocket server on port 8765
 
 ## Development Summary (March 23, 2025)
 

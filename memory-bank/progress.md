@@ -171,10 +171,12 @@ The following features are planned for future development:
 
 ## Known Issues
 
-1. High memory usage when processing very large web pages
-2. Occasional timeout on complex sites with many embedded resources
-3. Need to implement better error handling for network failures
-4. Docker environment may require adjustment for different host systems
+- ~~WebSocket event subscription failing with dependency errors~~ - FIXED: Added fallback mechanism for colorama
+- ~~WebSocket endpoint /ws/browser/events missing~~ - FIXED: Added endpoint to test_websocket.py
+- High memory usage when processing very large web pages
+- Occasional timeout on complex sites with many embedded resources
+- Need to implement better error handling for network failures
+- Docker environment may require adjustment for different host systems
 
 ## Next Milestone
 
