@@ -97,7 +97,7 @@ start_services() {
   # Start XQuartz if not running
   if ! pgrep -x "Xquartz" > /dev/null; then
     echo "Starting XQuartz..."
-    open -a XQuartz
+    open "/Applications/Utilities/XQuartz.app"
     sleep 3
   fi
   
@@ -120,7 +120,7 @@ start_services() {
     fi
     
     echo "Waiting... ($i/10)"
-    sleep 3
+    sleep 5
   done
 }
 
