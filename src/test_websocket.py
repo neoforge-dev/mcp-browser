@@ -266,6 +266,175 @@ async def websocket_browser_events(websocket: WebSocket):
         for subscription_id in client_subscriptions:
             await remove_subscription(subscription_id)
 
+# New endpoint for browser events at the expected path
+@app.websocket("/ws/browser/events")
+async def websocket_browser_events_alias(websocket: WebSocket):
+    """WebSocket endpoint for browser events (alias for compatibility)"""
+    await websocket.accept()
+    
+    # Generate a unique client ID
+    client_id = f"client_{str(uuid.uuid4())}"
+    
+    # Add to active connections
+    active_connections.add(websocket)
+    event_connections[client_id] = websocket
+    
+    # Send welcome message
+    await websocket.send_text(json.dumps({
+        "type": "connection",
+        "client_id": client_id,
+        "message": "Connected to MCP Browser Event Subscription Service",
+        "timestamp": time.time()
+    }))
+    
+    logger.info(f"Client {client_id} connected to browser events endpoint")
+    
+    try:
+        # Process incoming messages
+        while True:
+            # Receive message
+            data = await websocket.receive_text()
+            
+            try:
+                # Parse JSON message
+                message = json.loads(data)
+                action = message.get("action", "")
+                
+                # Process action
+                if action == "subscribe":
+                    # Subscribe to events
+                    event_types = message.get("event_types", [])
+                    filters = message.get("filters")
+                    
+                    # Generate subscription ID
+                    subscription_id = f"sub_{str(uuid.uuid4())}"
+                    
+                    # Add subscription
+                    await add_subscription(client_id, subscription_id, event_types, filters)
+                    
+                    # Send confirmation
+                    await websocket.send_text(json.dumps({
+                        "type": "subscription",
+                        "subscription_id": subscription_id,
+                        "event_types": event_types,
+                        "filters": filters,
+                        "timestamp": time.time()
+                    }))
+                    
+                elif action == "unsubscribe":
+                    # Unsubscribe from events
+                    subscription_id = message.get("subscription_id", "")
+                    
+                    # Remove subscription
+                    success = await remove_subscription(subscription_id)
+                    
+                    # Send confirmation
+                    await websocket.send_text(json.dumps({
+                        "type": "unsubscription",
+                        "subscription_id": subscription_id,
+                        "success": success,
+                        "timestamp": time.time()
+                    }))
+                    
+                elif action == "list":
+                    # List active subscriptions for this client
+                    client_subscriptions = {
+                        sub_id: sub_data
+                        for sub_id, sub_data in active_subscriptions.items()
+                        if sub_data.get("client_id") == client_id
+                    }
+                    
+                    # Send subscription list
+                    await websocket.send_text(json.dumps({
+                        "type": "subscription_list",
+                        "subscriptions": client_subscriptions,
+                        "timestamp": time.time()
+                    }))
+                
+                elif action == "execute":
+                    # Handle execute command (for navigation, etc.)
+                    command = message.get("command", "")
+                    params = message.get("params", {})
+                    
+                    # Log the command (in a real implementation, this would actually execute it)
+                    logger.info(f"Received execute command: {command} with params: {params}")
+                    
+                    # Send confirmation
+                    await websocket.send_text(json.dumps({
+                        "type": "command_executed",
+                        "command": command,
+                        "success": True,
+                        "message": f"Command {command} acknowledged (simulation)",
+                        "timestamp": time.time()
+                    }))
+                    
+                    # If this is a navigation command, generate a simulated PAGE event
+                    if command == "navigate" and "url" in params:
+                        # Simulate a page load event
+                        await asyncio.sleep(0.5)  # Simulate loading time
+                        
+                        page_event_data = {
+                            "url": params["url"],
+                            "title": f"Page Title for {params['url']}",
+                            "status": 200,
+                            "timestamp": time.time()
+                        }
+                        
+                        # Broadcast a PAGE event
+                        await broadcast_event("PAGE", "page.load", page_event_data)
+                
+                elif action == "test_event":
+                    # Generate a test event for debugging
+                    event_type = message.get("event_type", "PAGE")
+                    event_name = message.get("event_name", "test.event")
+                    event_data = message.get("data", {"message": "Test event"})
+                    
+                    # Broadcast event
+                    await broadcast_event(event_type, event_name, event_data)
+                    
+                    # Send confirmation
+                    await websocket.send_text(json.dumps({
+                        "type": "event_generated",
+                        "event_type": event_type,
+                        "event_name": event_name,
+                        "timestamp": time.time()
+                    }))
+                    
+                else:
+                    # Unknown action
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "error": f"Unknown action: {action}",
+                        "timestamp": time.time()
+                    }))
+                    
+            except json.JSONDecodeError:
+                # Invalid JSON
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "error": "Invalid JSON message",
+                    "timestamp": time.time()
+                }))
+                
+    except WebSocketDisconnect:
+        # Client disconnected
+        logger.info(f"Client {client_id} disconnected")
+        
+        # Remove from active connections
+        active_connections.discard(websocket)
+        
+        if client_id in event_connections:
+            del event_connections[client_id]
+        
+        # Remove client subscriptions
+        client_subscriptions = [
+            sub_id for sub_id, sub_data in active_subscriptions.items()
+            if sub_data.get("client_id") == client_id
+        ]
+        
+        for subscription_id in client_subscriptions:
+            await remove_subscription(subscription_id)
+
 # Simulated event generator task
 async def event_generator():
     """Generate simulated events for testing"""

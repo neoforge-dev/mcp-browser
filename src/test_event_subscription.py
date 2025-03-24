@@ -12,10 +12,25 @@ import argparse
 import logging
 import websockets
 from datetime import datetime
-from colorama import Fore, Style, init
 
-# Initialize colorama
-init()
+# Try to import colorama for colored output
+try:
+    from colorama import Fore, Style, init
+    # Initialize colorama
+    init()
+    HAS_COLORAMA = True
+except ImportError:
+    # Fallback if colorama is not available
+    print("Warning: colorama not found. Using plain text output.")
+    HAS_COLORAMA = False
+    
+    # Create dummy color objects
+    class DummyColors:
+        def __getattr__(self, name):
+            return ""
+    
+    Fore = DummyColors()
+    Style = DummyColors()
 
 # Configure logging
 logging.basicConfig(
