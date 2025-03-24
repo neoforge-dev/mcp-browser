@@ -4,7 +4,7 @@
 # Set variables
 API_URL="http://localhost:7665"
 TEST_URL="file://$(pwd)/src/test_events.html"
-WS_URL="ws://localhost:8765/ws/browser/events"
+WS_URL="ws://localhost:7665/ws/browser/events"
 OUTPUT_DIR="./test_output"
 EVENT_TYPES="PAGE,NETWORK,CONSOLE,DOM"
 
