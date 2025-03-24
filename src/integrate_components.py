@@ -11,6 +11,8 @@ import sys
 import asyncio
 import logging
 from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
 # Configure logging
 logging.basicConfig(
@@ -91,7 +93,7 @@ from error_handler import MCPBrowserException, ErrorCode, RetryConfig
 
 async def replace_browser_init(main_file: str):
     """
-    Replace existing browser initialization with BrowserPool integration
+    Replace existing browser initialization with BrowserPool integration and lifespan events
     
     Args:
         main_file: Path to main.py
@@ -99,96 +101,160 @@ async def replace_browser_init(main_file: str):
     with open(main_file, 'r') as f:
         content = f.read()
     
-    # Find the startup_event function and replace it
-    startup_function_start = content.find("@app.on_event(\"startup\")")
-    if startup_function_start == -1:
-        logger.error("Could not find startup event function")
+    # Check if file already contains lifespan context manager
+    if "asynccontextmanager" in content and "@asynccontextmanager" in content:
+        logger.info("File already contains lifespan context manager")
         return
     
-    function_start = content.find("async def startup_event", startup_function_start)
-    if function_start == -1:
-        logger.error("Could not find startup_event function")
+    # Add imports for asynccontextmanager if needed
+    if "from contextlib import asynccontextmanager" not in content:
+        if "from typing import" in content:
+            content = content.replace(
+                "from typing import", 
+                "from typing import AsyncGenerator, "
+            )
+        else:
+            # Add imports near the top after other imports
+            import_end = content.find("# Configure logging")
+            if import_end == -1:
+                import_end = content.find("import ")
+                import_end = content.find("\n", import_end) + 1
+            
+            content = (
+                content[:import_end] + 
+                "from contextlib import asynccontextmanager\n" + 
+                "from typing import AsyncGenerator\n" + 
+                content[import_end:]
+            )
+    
+    # Look for app initialization
+    app_init_start = content.find("app = FastAPI(")
+    if app_init_start == -1:
+        logger.error("Could not find FastAPI app initialization")
         return
     
-    # Find the end of the function
-    next_func = content.find("@app", function_start)
-    if next_func == -1:
-        logger.error("Could not determine end of startup_event function")
+    app_init_end = content.find(")", app_init_start)
+    if app_init_end == -1:
+        logger.error("Could not determine end of FastAPI app initialization")
         return
     
-    # New startup function content
-    new_startup = '@app.on_event("startup")\n'
-    new_startup += 'async def startup_event():\n'
-    new_startup += '    """Initialize services on startup"""\n'
-    new_startup += '    global app_state\n'
-    new_startup += '    app_state = {}\n'
-    new_startup += '    \n'
-    new_startup += '    # Configure the app with integration components\n'
-    new_startup += '    configure_app(app)\n'
-    new_startup += '    \n'
-    new_startup += '    # Initialize MCP client for tool registration\n'
-    new_startup += '    if os.environ.get("MCP_SERVER_URL") and os.environ.get("MCP_API_KEY"):\n'
-    new_startup += '        app_state["mcp_client"] = MCPClient(\n'
-    new_startup += '            model_name=os.environ.get("MCP_MODEL_NAME", "mcp-browser"),\n'
-    new_startup += '            server_url=os.environ.get("MCP_SERVER_URL"),\n'
-    new_startup += '            api_key=os.environ.get("MCP_API_KEY")\n'
-    new_startup += '        )\n'
-    new_startup += '        \n'
-    new_startup += '        try:\n'
-    new_startup += '            await app_state["mcp_client"].register_tools()\n'
-    new_startup += '            logger.info("MCP tools registered successfully")\n'
-    new_startup += '        except Exception as e:\n'
-    new_startup += '            logger.error(f"Failed to register MCP tools: {str(e)}")\n'
-    new_startup += '    else:\n'
-    new_startup += '        logger.warning("MCP_SERVER_URL or MCP_API_KEY not set, skipping MCP tool registration")\n'
-    new_startup += '    \n'
-    new_startup += '    # Initialize event subscriptions\n'
-    new_startup += '    app_state["subscriptions"] = {}\n'
-    new_startup += '    \n'
-    new_startup += '    logger.info("MCP Browser server started")\n'
+    # Create lifespan function
+    lifespan_code = """
+# Define lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    \"\"\"Lifespan context manager for startup and shutdown events\"\"\"
+    global app_state
+    app_state = {}
     
-    # Replace the startup function
-    updated_content = content[:startup_function_start] + new_startup + content[next_func:]
+    # Configure the app with integration components
+    configure_app(app)
     
-    # Also replace shutdown function
-    shutdown_function_start = updated_content.find("@app.on_event(\"shutdown\")")
-    if shutdown_function_start == -1:
-        logger.error("Could not find shutdown event function")
-        return
+    # Initialize MCP client for tool registration
+    if os.environ.get("MCP_SERVER_URL") and os.environ.get("MCP_API_KEY"):
+        app_state["mcp_client"] = MCPClient(
+            model_name=os.environ.get("MCP_MODEL_NAME", "mcp-browser"),
+            server_url=os.environ.get("MCP_SERVER_URL"),
+            api_key=os.environ.get("MCP_API_KEY")
+        )
+        
+        try:
+            await app_state["mcp_client"].register_tools()
+            logger.info("MCP tools registered successfully")
+        except Exception as e:
+            logger.error(f"Failed to register MCP tools: {str(e)}")
+    else:
+        logger.warning("MCP_SERVER_URL or MCP_API_KEY not set, skipping MCP tool registration")
     
-    function_start = updated_content.find("async def shutdown_event", shutdown_function_start)
-    if function_start == -1:
-        logger.error("Could not find shutdown_event function")
-        return
+    # Initialize event subscriptions
+    app_state["subscriptions"] = {}
     
-    # Find the end of the function
-    next_func = updated_content.find("@app", function_start)
-    if next_func == -1:
-        logger.error("Could not determine end of shutdown_event function")
-        return
+    logger.info("MCP Browser server started")
     
-    # New shutdown function content
-    new_shutdown = '@app.on_event("shutdown")\n'
-    new_shutdown += 'async def shutdown_event():\n'
-    new_shutdown += '    """Cleanup on shutdown"""\n'
-    new_shutdown += '    global app_state\n'
-    new_shutdown += '    \n'
-    new_shutdown += '    # Close MCP client\n'
-    new_shutdown += '    if app_state.get("mcp_client"):\n'
-    new_shutdown += '        await app_state["mcp_client"].close()\n'
-    new_shutdown += '        \n'
-    new_shutdown += '    # Clear subscriptions\n'
-    new_shutdown += '    app_state["subscriptions"] = {}\n'
-    new_shutdown += '    \n'
-    new_shutdown += '    logger.info("MCP Browser server shut down")\n'
+    yield  # Run the application
     
-    # Replace the shutdown function
-    updated_content = updated_content[:shutdown_function_start] + new_shutdown + updated_content[next_func:]
+    # Cleanup on shutdown
     
+    # Close MCP client
+    if app_state.get("mcp_client"):
+        await app_state["mcp_client"].close()
+        
+    # Clear subscriptions
+    app_state["subscriptions"] = {}
+    
+    logger.info("MCP Browser server shut down")
+
+"""
+    
+    # Find a good insertion point for the lifespan function
+    # Look for # App state or some other clear marker before app initialization
+    app_state_pos = content.find("# App state")
+    if app_state_pos == -1:
+        # Insert after imports but before app initialization
+        app_state_pos = content.find("# Configure logging")
+        if app_state_pos == -1:
+            app_state_pos = app_init_start
+        else:
+            # Find the next section after logging config
+            next_section = content.find("#", app_state_pos + 15)
+            if next_section != -1 and next_section < app_init_start:
+                app_state_pos = next_section
+            else:
+                app_state_pos = app_init_start
+    
+    # Insert lifespan code before app initialization
+    content = content[:app_state_pos] + lifespan_code + content[app_state_pos:]
+    
+    # Update app initialization to use lifespan
+    app_init_content = content[app_init_start:app_init_end+1]
+    if "lifespan=lifespan" not in app_init_content:
+        # Check if there's a comma at the end of the last parameter
+        if app_init_content.rstrip().endswith(","):
+            new_app_init = app_init_content.rstrip() + "\n    lifespan=lifespan\n)"
+        else:
+            new_app_init = app_init_content.rstrip()[:-1] + ",\n    lifespan=lifespan\n)"
+        
+        # Replace app initialization
+        content = content[:app_init_start] + new_app_init + content[app_init_end+1:]
+    
+    # Remove old @app.on_event handlers that we've replaced with lifespan
+    startup_event_pos = content.find('@app.on_event("startup")')
+    if startup_event_pos != -1:
+        # Find the end of the startup_event function
+        function_start = content.find("async def startup_event", startup_event_pos)
+        if function_start != -1:
+            # Find the end of the function by looking for the next function or class
+            next_func = content.find("@app", function_start + 30)
+            if next_func == -1:
+                next_func = content.find("def ", function_start + 30)
+            if next_func == -1:
+                next_func = content.find("class ", function_start + 30)
+            
+            if next_func != -1:
+                # Remove the startup event handler
+                content = content[:startup_event_pos] + content[next_func:]
+    
+    shutdown_event_pos = content.find('@app.on_event("shutdown")')
+    if shutdown_event_pos != -1:
+        # Find the end of the shutdown_event function
+        function_start = content.find("async def shutdown_event", shutdown_event_pos)
+        if function_start != -1:
+            # Find the end of the function by looking for the next function or class
+            next_func = content.find("@app", function_start + 30)
+            if next_func == -1:
+                next_func = content.find("def ", function_start + 30)
+            if next_func == -1:
+                next_func = content.find("class ", function_start + 30)
+            
+            if next_func != -1:
+                # Remove the shutdown event handler
+                content = content[:shutdown_event_pos] + content[next_func:]
+    
+    # Write updated content back to file
     with open(main_file, 'w') as f:
-        f.write(updated_content)
+        f.write(content)
     
-    logger.info("Browser initialization replaced with BrowserPool integration")
+    logger.info("Updated main.py with lifespan event handlers and browser integration")
 
 async def apply_error_handling(main_file: str):
     """

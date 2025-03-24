@@ -53,17 +53,17 @@ EVENT_COLORS = {
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="MCP Browser Event Subscription Test")
 parser.add_argument(
-    "--url", 
+    "--url", "-s", 
     default="ws://localhost:7665/ws/browser/events", 
     help="WebSocket URL for the browser events endpoint"
 )
 parser.add_argument(
-    "--types", 
+    "--types", "-t", 
     default="PAGE,NETWORK,CONSOLE,DOM", 
     help="Comma-separated list of event types to subscribe to"
 )
 parser.add_argument(
-    "--filter-url", 
+    "--filter-url", "-f", 
     default="", 
     help="Filter events by URL pattern"
 )

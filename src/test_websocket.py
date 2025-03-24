@@ -10,12 +10,13 @@ import logging
 import uuid
 import time
 from datetime import datetime
-from typing import Dict, List, Set, Any, Optional
+from typing import Dict, List, Set, Any, Optional, AsyncGenerator
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from enum import Enum
+from contextlib import asynccontextmanager
 
 # Configure logging
 logging.basicConfig(
@@ -24,18 +25,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-# Create FastAPI app
-app = FastAPI(title="WebSocket Event Test")
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Define event types and models
 class EventType(str, Enum):
@@ -55,6 +44,43 @@ subscription_handlers: Dict[str, List[str]] = {
     "CONSOLE": [],
     "NETWORK": [],
 }
+
+# Forward declare the event generator function signature
+async def event_generator():
+    """Generate simulated events for testing"""
+    pass  # Actual implementation below
+
+# Define lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup: Create task for event generator
+    event_task = asyncio.create_task(event_generator())
+    logger.info("WebSocket Event Test Server started")
+    
+    yield  # Run the application
+    
+    # Shutdown: Cancel the event generator task
+    event_task.cancel()
+    try:
+        await event_task
+    except asyncio.CancelledError:
+        logger.info("Event generator task cancelled")
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="WebSocket Event Test",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Event handler functions
 async def broadcast_event(event_type: str, event_name: str, data: Dict[str, Any]):
@@ -116,6 +142,47 @@ async def remove_subscription(subscription_id: str):
         return True
     
     return False
+
+# Actual implementation of event generator task
+async def event_generator():
+    """Generate simulated events for testing"""
+    event_types = ["PAGE", "DOM", "CONSOLE", "NETWORK"]
+    event_names = {
+        "PAGE": ["page.load", "page.navigate", "page.error"],
+        "DOM": ["dom.mutation", "dom.attribute", "dom.child"],
+        "CONSOLE": ["console.log", "console.error", "console.warning"],
+        "NETWORK": ["network.request", "network.response", "network.error"]
+    }
+    
+    while True:
+        # Only generate events if there are active subscriptions
+        if active_subscriptions:
+            # Select random event type
+            event_type = event_types[int(time.time() * 10) % len(event_types)]
+            
+            # Check if there are any subscribers for this event type
+            if subscription_handlers.get(event_type, []):
+                # Select random event name
+                names = event_names.get(event_type, ["test.event"])
+                event_name = names[int(time.time() * 100) % len(names)]
+                
+                # Generate event data
+                data = {
+                    "timestamp": datetime.now().strftime("%H:%M:%S"),
+                    "message": f"Simulated {event_type}.{event_name} event",
+                    "value": round(time.time() % 100, 2),
+                    "details": {
+                        "random": uuid.uuid4().hex[:8],
+                        "counter": int(time.time()) % 1000
+                    }
+                }
+                
+                # Broadcast event
+                await broadcast_event(event_type, event_name, data)
+                logger.debug(f"Generated event: {event_type}.{event_name}")
+        
+        # Wait before generating next event
+        await asyncio.sleep(2)
 
 # API endpoints
 @app.get("/api/status")
@@ -435,53 +502,7 @@ async def websocket_browser_events_alias(websocket: WebSocket):
         for subscription_id in client_subscriptions:
             await remove_subscription(subscription_id)
 
-# Simulated event generator task
-async def event_generator():
-    """Generate simulated events for testing"""
-    event_types = ["PAGE", "DOM", "CONSOLE", "NETWORK"]
-    event_names = {
-        "PAGE": ["page.load", "page.navigate", "page.error"],
-        "DOM": ["dom.mutation", "dom.attribute", "dom.child"],
-        "CONSOLE": ["console.log", "console.error", "console.warning"],
-        "NETWORK": ["network.request", "network.response", "network.error"]
-    }
-    
-    while True:
-        # Only generate events if there are active subscriptions
-        if active_subscriptions:
-            # Select random event type
-            event_type = event_types[int(time.time() * 10) % len(event_types)]
-            
-            # Check if there are any subscribers for this event type
-            if subscription_handlers.get(event_type, []):
-                # Select random event name
-                names = event_names.get(event_type, ["test.event"])
-                event_name = names[int(time.time() * 100) % len(names)]
-                
-                # Generate event data
-                data = {
-                    "timestamp": datetime.now().strftime("%H:%M:%S"),
-                    "message": f"Simulated {event_type}.{event_name} event",
-                    "value": round(time.time() % 100, 2),
-                    "details": {
-                        "random": uuid.uuid4().hex[:8],
-                        "counter": int(time.time()) % 1000
-                    }
-                }
-                
-                # Broadcast event
-                await broadcast_event(event_type, event_name, data)
-                logger.debug(f"Generated event: {event_type}.{event_name}")
-        
-        # Wait before generating next event
-        await asyncio.sleep(2)
-
-@app.on_event("startup")
-async def startup_event():
-    """Start event generator on startup"""
-    asyncio.create_task(event_generator())
-    logger.info("WebSocket Event Test Server started")
-
 # Main entry point
 if __name__ == "__main__":
-    uvicorn.run("test_websocket:app", host="0.0.0.0", port=8765, reload=True) 
+    # Use reload=False to prevent frequent reloads during development
+    uvicorn.run("test_websocket:app", host="0.0.0.0", port=8765, reload=False) 

@@ -7,7 +7,7 @@ This module provides a FastAPI server with browser automation capabilities.
 
 import os
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, AsyncGenerator
 import json
 import time
 
@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Depends, WebSocket, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 # Configure logging
 logging.basicConfig(
@@ -23,22 +24,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("mcp-browser")
-
-# Create FastAPI app
-app = FastAPI(
-    title="MCP Browser",
-    description="Browser automation server for MCP",
-    version="0.1.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # App state
 app_state = {}
@@ -71,25 +56,43 @@ class BrowserType(BrowserSelector):
     text: str
     delay: Optional[int] = 0
 
-# Event handlers
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
+# Define lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Lifespan context manager for startup and shutdown events"""
     global app_state
+    
+    # Startup: Initialize services
     app_state = {}
     
     # Initialize app state here
     
     logger.info("MCP Browser server started")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    global app_state
+    
+    yield  # Run the application
+    
+    # Shutdown: Cleanup resources
     
     # Cleanup resources here
     
     logger.info("MCP Browser server shut down")
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="MCP Browser",
+    description="Browser automation server for MCP",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Define auth functions
 def create_access_token(data: dict, expires_delta: Optional[int] = None):

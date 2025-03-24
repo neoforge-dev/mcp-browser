@@ -1,78 +1,74 @@
 #!/bin/bash
-# Test script for MCP Browser Event Subscriptions
+# Test script for MCP WebSocket event subscription
 
-# Set variables
-API_URL="http://localhost:7665"
-TEST_URL="file://$(pwd)/src/test_events.html"
-WS_URL="ws://localhost:7665/ws/browser/events"
-OUTPUT_DIR="./test_output"
-EVENT_TYPES="PAGE,NETWORK,CONSOLE,DOM"
+set -e
 
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Configuration
+HOST=${HOST:-"localhost"}
+PORT=${PORT:-8765}
+ENDPOINT="ws://$HOST:$PORT/ws/browser/events"
 
-# Create output directory if it doesn't exist
-mkdir -p $OUTPUT_DIR
+# Check if colorama is available for colored output
+if python3 -c "import colorama" &>/dev/null; then
+    HAS_COLORAMA=1
+else
+    HAS_COLORAMA=0
+    echo "Notice: colorama not installed. Running without color."
+fi
 
-echo -e "${YELLOW}========================================================${NC}"
-echo -e "${YELLOW}MCP Browser Event Subscriptions Test${NC}"
-echo -e "${YELLOW}========================================================${NC}"
-echo "API URL: $API_URL"
-echo "Test URL: $TEST_URL"
-echo "WebSocket URL: $WS_URL"
-echo -e "${YELLOW}========================================================${NC}"
+# Color output function
+color_echo() {
+    local COLOR=$1
+    local TEXT=$2
+    
+    if [ "$HAS_COLORAMA" -eq 1 ]; then
+        python3 -c "import colorama; colorama.init(); print($COLOR + '$TEXT' + colorama.Style.RESET_ALL)" | cat
+    else
+        echo "$TEXT"
+    fi
+}
 
-# Check if API is running
-echo -e "${BLUE}Checking API status...${NC}"
-STATUS=$(curl -s $API_URL/api/status)
-echo "API Status: $STATUS"
+# Start the WebSocket server if it's not already running
+if ! nc -z localhost $PORT 2>/dev/null; then
+    color_echo "colorama.Fore.YELLOW" "Starting WebSocket server..."
+    python3 src/test_websocket.py & 
+    WEBSOCKET_PID=$!
+    
+    # Wait for server to start
+    sleep 2
+    
+    color_echo "colorama.Fore.GREEN" "WebSocket server started with PID $WEBSOCKET_PID"
+    
+    # Register cleanup handler
+    cleanup() {
+        color_echo "colorama.Fore.YELLOW" "Stopping WebSocket server..."
+        kill $WEBSOCKET_PID 2>/dev/null || true
+        color_echo "colorama.Fore.GREEN" "WebSocket server stopped"
+        exit 0
+    }
+    
+    trap cleanup INT TERM EXIT
+fi
 
-if [[ $STATUS != *"\"status\":\"ok\""* ]]; then
-    echo -e "${RED}Error: API is not running or not responding correctly.${NC}"
+# Check if server is running
+if ! nc -z localhost $PORT 2>/dev/null; then
+    color_echo "colorama.Fore.RED" "WebSocket server is not running!"
     exit 1
 fi
 
-# Install required dependencies if not already installed
-echo -e "${BLUE}Checking dependencies...${NC}"
+# Run client test with websocket-client and colorama
+color_echo "colorama.Fore.BLUE" "Testing WebSocket event subscription..."
 
-if ! pip show websockets >/dev/null 2>&1; then
-    echo "Installing websockets..."
-    pip install websockets
-fi
+# Run the client and pipe to cat to prevent interactive issues
+python3 src/test_event_subscription.py -s $ENDPOINT -t "PAGE,DOM" -f "*example.com*" | cat
 
-if ! pip show colorama >/dev/null 2>&1; then
-    echo "Installing colorama..."
-    pip install colorama
-fi
-
-echo -e "${GREEN}Dependencies checked.${NC}"
-
-# Function to test WebSocket event subscriptions
-test_websocket_events() {
-    echo -e "${BLUE}Testing WebSocket event subscriptions...${NC}"
-    echo "Launching event subscription client..."
-    echo "Target URL: $TEST_URL"
-    
-    # Start the event subscription client with the given parameters
-    python3 src/test_event_subscription.py --url $WS_URL --types $EVENT_TYPES --target-url $TEST_URL
-}
-
-# Check if we should run in test mode or interactive mode
-if [ "$1" == "--test" ]; then
-    # Test mode: navigate to test URL, collect events for 10 seconds, then exit
-    echo -e "${BLUE}Running in test mode (automatic)...${NC}"
-    echo "Will navigate to test page and collect events for 10 seconds"
-    python3 src/test_event_subscription.py --url $WS_URL --types $EVENT_TYPES --target-url $TEST_URL --timeout 10
+# If we started the server, we'll clean it up on exit via the trap
+if [ -n "$WEBSOCKET_PID" ]; then
+    color_echo "colorama.Fore.GREEN" "Test completed successfully. Press Ctrl+C to exit."
+    # Keep the script running so the server stays alive for manual testing
+    while true; do
+        sleep 1
+    done
 else
-    # Interactive mode: user can see events in real-time and interact with the test page
-    echo -e "${BLUE}Running in interactive mode...${NC}"
-    echo "Press Ctrl+C to exit"
-    test_websocket_events
-fi
-
-echo -e "${GREEN}Test completed.${NC}"
-exit 0 
+    color_echo "colorama.Fore.GREEN" "Test completed successfully."
+fi 

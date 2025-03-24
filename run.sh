@@ -35,7 +35,9 @@ fi
 # Build and start the MCP browser container
 echo "Building and starting MCP browser..."
 echo "The server will be available at http://localhost:7665"
-docker-compose up --build "$@"
+
+# Use cat to prevent interactive output issues
+docker-compose up --build "$@" | cat
 
 # Handle exit
 echo "MCP browser stopped." 

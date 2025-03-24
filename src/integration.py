@@ -10,13 +10,14 @@ import logging
 import asyncio
 import time
 import uuid
-from typing import Dict, List, Optional, Any, Set, Callable
+from typing import Dict, List, Optional, Any, Set, Callable, AsyncGenerator
 from datetime import datetime, timedelta
 
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
 # Import our components
 from browser_pool import BrowserInstance, browser_pool, initialize_browser_pool, close_browser_pool
@@ -376,29 +377,39 @@ class AuthManager:
 browser_manager = BrowserManager()
 auth_manager = AuthManager()
 
-def configure_app(app: FastAPI):
+def configure_app(app: FastAPI) -> FastAPI:
     """
-    Configure the FastAPI app with startup and shutdown events
+    Configure the FastAPI app with lifespan event handlers
     
     Args:
         app: FastAPI app
+        
+    Returns:
+        FastAPI app with lifespan configured
     """
-    @app.on_event("startup")
-    async def startup_event():
-        """Initialize services on startup"""
+    # Define lifespan context manager for this app
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """Lifespan context manager for startup and shutdown events"""
+        # Startup: Initialize services
         max_browsers = int(os.environ.get("MAX_BROWSERS", 10))
         idle_timeout = int(os.environ.get("IDLE_TIMEOUT", 300))
         
         await browser_manager.initialize(max_browsers, idle_timeout)
         
         logger.info("Integration services initialized")
-    
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Cleanup on shutdown"""
+        
+        yield  # Run the application
+        
+        # Shutdown: Clean up resources
         await browser_manager.shutdown()
         
         logger.info("Integration services shut down")
+    
+    # Configure app with lifespan
+    app.router.lifespan_context = lifespan
+    
+    return app
 
 # Export components and functions
 __all__ = [

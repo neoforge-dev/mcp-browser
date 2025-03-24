@@ -22,12 +22,12 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
-# Run the simple test
+# Run the simple test with pipe to cat to avoid interactive issues
 echo "Running simple API test..."
-python src/simple_test.py
+python src/simple_test.py | cat
 
-# Get the exit code
-EXIT_CODE=$?
+# Get the exit code (use PIPESTATUS to get the exit code of the python command, not cat)
+EXIT_CODE=${PIPESTATUS[0]}
 
 # Output based on success or failure
 if [ $EXIT_CODE -eq 0 ]; then
