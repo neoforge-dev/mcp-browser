@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# MCP Browser One-Line Installer for Mac Mini
-# This script installs and configures MCP Browser for visual testing on Mac
+# MCP Browser Simple Installer
+# This script skips the XQuartz setup since it's already running
 
 set -e
 
@@ -12,65 +12,37 @@ PORT=7665
 SECRET=$(openssl rand -hex 16)
 LOG_FILE="$HOME/mcp-browser-install.log"
 
-# Function to check for prerequisites
-check_prerequisites() {
-  echo "Checking prerequisites..."
-  
-  # Check for Git
-  if ! command -v git &> /dev/null; then
-    echo "Git not found. Installing..."
-    brew install git
-  fi
-  
-  # Check for Docker
-  if ! command -v docker &> /dev/null; then
-    echo "Docker not found. Installing..."
-    brew install docker
-    brew install docker-compose
-  fi
-  
-  # Check for Python
-  if ! command -v python3 &> /dev/null; then
-    echo "Python not found. Installing..."
-    brew install python
-  fi
-  
-  # Check for XQuartz (X11 for Mac)
-  if ! command -v xquartz &> /dev/null; then
-    echo "XQuartz not found. Installing..."
-    brew install --cask xquartz
-  fi
-}
+echo "========================================"
+echo "      MCP Browser Simple Installer"
+echo "========================================"
+echo ""
+echo "This will install MCP Browser using your"
+echo "already running X11 server."
+echo ""
 
-# Function to clone or update repository
-setup_repository() {
-  echo "Setting up repository..."
-  
-  if [ -d "$INSTALL_DIR" ]; then
-    echo "Repository exists. Updating..."
-    cd "$INSTALL_DIR"
-    git pull
-  else
-    echo "Cloning repository..."
-    git clone "$REPO_URL" "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-  fi
-}
+# Clone or update repository
+echo "Setting up repository..."
+if [ -d "$INSTALL_DIR" ]; then
+  echo "Repository exists. Updating..."
+  cd "$INSTALL_DIR"
+  git pull
+else
+  echo "Cloning repository..."
+  git clone "$REPO_URL" "$INSTALL_DIR"
+  cd "$INSTALL_DIR"
+fi
 
-# Function to configure environment
-configure_environment() {
-  echo "Configuring environment..."
-  
-  # Create .env file
-  cat > "$INSTALL_DIR/.env" << EOF
+# Configure environment
+echo "Configuring environment..."
+cat > "$INSTALL_DIR/.env" << EOF
 MCP_SECRET=$SECRET
 SERVER_PORT=8000
 EOF
 
-  # Create browser display configuration
-  echo "Configuring browser display..."
-  mkdir -p "$HOME/.mcp-browser"
-  cat > "$HOME/.mcp-browser/config.json" << EOF
+# Create browser display configuration
+echo "Configuring browser display..."
+mkdir -p "$HOME/.mcp-browser"
+cat > "$HOME/.mcp-browser/config.json" << EOF
 {
   "display": {
     "width": 1280,
@@ -88,61 +60,34 @@ EOF
   }
 }
 EOF
-}
 
-# Function to start services
-start_services() {
-  echo "Starting services..."
-  
-  # Start XQuartz if not running
-  if ! pgrep -x "Xquartz" > /dev/null && ! pgrep -x "X11" > /dev/null; then
-    echo "Starting XQuartz X11 server..."
-    # Try running the binary directly
-    if [ -f "/Applications/Utilities/XQuartz.app/Contents/MacOS/X11" ]; then
-      /Applications/Utilities/XQuartz.app/Contents/MacOS/X11 &
-      sleep 5
-    elif [ -f "/opt/X11/bin/Xquartz" ]; then
-      /opt/X11/bin/Xquartz &
-      sleep 5
-    else
-      echo "Warning: Could not start XQuartz directly. Trying to open the app..."
-      open "/Applications/Utilities/XQuartz.app"
-      sleep 5
-    fi
-  else
-    echo "XQuartz is already running."
+# Start MCP Browser
+echo "Starting MCP Browser services..."
+cd "$INSTALL_DIR"
+docker-compose down || true
+docker-compose up -d
+
+# Wait for service to be ready
+echo "Waiting for MCP Browser to be ready..."
+for i in {1..15}; do
+  if curl -s "http://localhost:$PORT/api/status" | grep -q "ok"; then
+    echo "MCP Browser is ready!"
+    break
   fi
   
-  # Start MCP Browser
-  cd "$INSTALL_DIR"
-  docker-compose down || true
-  docker-compose up -d
+  if [ $i -eq 15 ]; then
+    echo "MCP Browser failed to start. Check logs."
+    exit 1
+  fi
   
-  # Wait for service to be ready
-  echo "Waiting for MCP Browser to be ready..."
-  for i in {1..10}; do
-    if curl -s "http://localhost:$PORT/api/status" | grep -q "ok"; then
-      echo "MCP Browser is ready!"
-      break
-    fi
-    
-    if [ $i -eq 10 ]; then
-      echo "MCP Browser failed to start. Check logs."
-      exit 1
-    fi
-    
-    echo "Waiting... ($i/10)"
-    sleep 5
-  done
-}
+  echo "Waiting... ($i/15)"
+  sleep 5
+done
 
-# Function to set up browser client
-setup_browser_client() {
-  echo "Setting up browser client..."
-  
-  # Create browser client HTML for testing
-  mkdir -p "$HOME/.mcp-browser/client"
-  cat > "$HOME/.mcp-browser/client/index.html" << EOF
+# Set up browser client
+echo "Setting up browser client..."
+mkdir -p "$HOME/.mcp-browser/client"
+cat > "$HOME/.mcp-browser/client/index.html" << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -188,6 +133,9 @@ setup_browser_client() {
   </div>
 
   <script>
+    // Get port from URL or use default
+    const PORT = 7665;
+    
     // DOM Elements
     const statusEl = document.getElementById('status');
     const eventLogEl = document.getElementById('event-log');
@@ -207,7 +155,7 @@ setup_browser_client() {
     // Log an event
     function logEvent(message, isError = false) {
       const item = document.createElement('div');
-      item.textContent = \`[\${new Date().toLocaleTimeString()}] \${message}\`;
+      item.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
       if (isError) {
         item.style.color = '#dc3545';
       }
@@ -218,7 +166,7 @@ setup_browser_client() {
     // Connect to WebSocket
     connectBtn.addEventListener('click', () => {
       // Connect to main WebSocket
-      socket = new WebSocket(\`ws://localhost:${PORT}/ws\`);
+      socket = new WebSocket(`ws://localhost:${PORT}/ws`);
       
       socket.onopen = () => {
         statusEl.textContent = 'Connected';
@@ -238,7 +186,7 @@ setup_browser_client() {
       
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        logEvent(\`Received: \${JSON.stringify(data)}\`);
+        logEvent(`Received: ${JSON.stringify(data)}`);
       };
       
       socket.onclose = () => {
@@ -258,7 +206,7 @@ setup_browser_client() {
       };
       
       socket.onerror = (error) => {
-        logEvent(\`WebSocket Error: \${error}\`, true);
+        logEvent(`WebSocket Error: ${error}`, true);
       };
     });
     
@@ -276,7 +224,7 @@ setup_browser_client() {
     // Subscribe to events
     subscribeBtn.addEventListener('click', () => {
       // Connect to event WebSocket
-      eventSocket = new WebSocket(\`ws://localhost:${PORT}/ws/browser/events\`);
+      eventSocket = new WebSocket(`ws://localhost:${PORT}/ws/browser/events`);
       
       eventSocket.onopen = () => {
         logEvent('Connected to Event WebSocket');
@@ -293,7 +241,7 @@ setup_browser_client() {
       
       eventSocket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        logEvent(\`Event: \${JSON.stringify(data)}\`);
+        logEvent(`Event: ${JSON.stringify(data)}`);
       };
       
       eventSocket.onclose = () => {
@@ -301,7 +249,7 @@ setup_browser_client() {
       };
       
       eventSocket.onerror = (error) => {
-        logEvent(\`Event WebSocket Error: \${error}\`, true);
+        logEvent(`Event WebSocket Error: ${error}`, true);
       };
     });
     
@@ -310,7 +258,7 @@ setup_browser_client() {
       if (socket && socket.readyState === WebSocket.OPEN) {
         const url = urlInput.value;
         
-        fetch(\`http://localhost:${PORT}/api/browser/navigate\`, {
+        fetch(`http://localhost:${PORT}/api/browser/navigate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -319,10 +267,10 @@ setup_browser_client() {
         })
         .then(response => response.json())
         .then(data => {
-          logEvent(\`Navigated to: \${url}\`);
+          logEvent(`Navigated to: ${url}`);
         })
         .catch((error) => {
-          logEvent(\`Navigation Error: \${error}\`, true);
+          logEvent(`Navigation Error: ${error}`, true);
         });
       }
     });
@@ -330,7 +278,7 @@ setup_browser_client() {
     // Take screenshot
     screenshotBtn.addEventListener('click', () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        fetch(\`http://localhost:${PORT}/api/browser/screenshot\`, {
+        fetch(`http://localhost:${PORT}/api/browser/screenshot`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -341,7 +289,7 @@ setup_browser_client() {
         .then(data => {
           if (data.image_data) {
             const img = document.createElement('img');
-            img.src = \`data:image/png;base64,\${data.image_data}\`;
+            img.src = `data:image/png;base64,${data.image_data}`;
             img.style.maxWidth = '100%';
             img.style.marginTop = '10px';
             
@@ -355,7 +303,7 @@ setup_browser_client() {
           }
         })
         .catch((error) => {
-          logEvent(\`Screenshot Error: \${error}\`, true);
+          logEvent(`Screenshot Error: ${error}`, true);
         });
       }
     });
@@ -363,7 +311,7 @@ setup_browser_client() {
     // Go back
     backBtn.addEventListener('click', () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        fetch(\`http://localhost:${PORT}/api/browser/back\`, {
+        fetch(`http://localhost:${PORT}/api/browser/back`, {
           method: 'POST',
         })
         .then(response => response.json())
@@ -371,7 +319,7 @@ setup_browser_client() {
           logEvent('Navigated back');
         })
         .catch((error) => {
-          logEvent(\`Back Error: \${error}\`, true);
+          logEvent(`Back Error: ${error}`, true);
         });
       }
     });
@@ -379,7 +327,7 @@ setup_browser_client() {
     // Go forward
     forwardBtn.addEventListener('click', () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        fetch(\`http://localhost:${PORT}/api/browser/forward\`, {
+        fetch(`http://localhost:${PORT}/api/browser/forward`, {
           method: 'POST',
         })
         .then(response => response.json())
@@ -387,7 +335,7 @@ setup_browser_client() {
           logEvent('Navigated forward');
         })
         .catch((error) => {
-          logEvent(\`Forward Error: \${error}\`, true);
+          logEvent(`Forward Error: ${error}`, true);
         });
       }
     });
@@ -396,54 +344,36 @@ setup_browser_client() {
 </html>
 EOF
 
-  echo "Browser client is available at: file://$HOME/.mcp-browser/client/index.html"
-}
+echo "Browser client is available at: file://$HOME/.mcp-browser/client/index.html"
 
-# Function to display installation summary
-show_summary() {
-  local IP_ADDRESS=$(ipconfig getifaddr en0 || echo "localhost")
-  
-  echo ""
-  echo "========================================"
-  echo "      MCP Browser Installation Complete"
-  echo "========================================"
-  echo ""
-  echo "Server URL: http://$IP_ADDRESS:$PORT"
-  echo "API Status: http://$IP_ADDRESS:$PORT/api/status"
-  echo "WebSocket:  ws://$IP_ADDRESS:$PORT/ws"
-  echo "Event WS:   ws://$IP_ADDRESS:$PORT/ws/browser/events"
-  echo ""
-  echo "Test Client: file://$HOME/.mcp-browser/client/index.html"
-  echo ""
-  echo "Connection Details:"
-  echo "MCP Secret: $SECRET"
-  echo ""
-  echo "Installation Log: $LOG_FILE"
-  echo ""
-  echo "Connect your MCP client to this Mac using:"
-  echo "IP: $IP_ADDRESS"
-  echo "Port: $PORT"
-  echo "Secret: $SECRET"
-  echo ""
-  echo "To stop the server: cd $INSTALL_DIR && docker-compose down"
-  echo "To start the server: cd $INSTALL_DIR && docker-compose up -d"
-  echo ""
-  echo "========================================"
-}
+# Display installation summary
+IP_ADDRESS=$(ipconfig getifaddr en0 || echo "localhost")
 
-# Main installation function
-main() {
-  echo "Starting MCP Browser installation..."
-  
-  check_prerequisites
-  setup_repository
-  configure_environment
-  start_services
-  setup_browser_client
-  show_summary
-  
-  echo "MCP Browser installation completed successfully!"
-}
+echo ""
+echo "========================================"
+echo "      MCP Browser Installation Complete"
+echo "========================================"
+echo ""
+echo "Server URL: http://$IP_ADDRESS:$PORT"
+echo "API Status: http://$IP_ADDRESS:$PORT/api/status"
+echo "WebSocket:  ws://$IP_ADDRESS:$PORT/ws"
+echo "Event WS:   ws://$IP_ADDRESS:$PORT/ws/browser/events"
+echo ""
+echo "Test Client: file://$HOME/.mcp-browser/client/index.html"
+echo ""
+echo "Connection Details:"
+echo "MCP Secret: $SECRET"
+echo ""
+echo "Installation Log: $LOG_FILE"
+echo ""
+echo "Connect your MCP client to this Mac using:"
+echo "IP: $IP_ADDRESS"
+echo "Port: $PORT"
+echo "Secret: $SECRET"
+echo ""
+echo "To stop the server: cd $INSTALL_DIR && docker-compose down"
+echo "To start the server: cd $INSTALL_DIR && docker-compose up -d"
+echo ""
+echo "========================================"
 
-# Execute main function and log output
-main 2>&1 | tee -a "$LOG_FILE" 
+echo "MCP Browser installation completed successfully!" 

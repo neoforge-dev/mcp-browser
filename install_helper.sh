@@ -44,7 +44,26 @@ if [ -f "$MCP_INSTALLER" ]; then
   
   # Fix the XQuartz path in the main installer
   echo "Fixing paths in the installer..."
-  sed -i '' 's|open -a XQuartz|open "/Applications/Utilities/XQuartz.app"|g' "$MCP_INSTALLER"
+  
+  # Replace the XQuartz launching code with our more robust version
+  sed -i '' '/if ! pgrep -x "Xquartz" > \/dev\/null; then/,/fi/c\
+  if ! pgrep -x "Xquartz" > /dev/null && ! pgrep -x "X11" > /dev/null; then\
+    echo "Starting XQuartz X11 server..."\
+    # Try running the binary directly\
+    if [ -f "/Applications/Utilities/XQuartz.app/Contents/MacOS/X11" ]; then\
+      /Applications/Utilities/XQuartz.app/Contents/MacOS/X11 \&\
+      sleep 5\
+    elif [ -f "/opt/X11/bin/Xquartz" ]; then\
+      /opt/X11/bin/Xquartz \&\
+      sleep 5\
+    else\
+      echo "Warning: Could not start XQuartz directly. Trying to open the app..."\
+      open "/Applications/Utilities/XQuartz.app"\
+      sleep 5\
+    fi\
+  else\
+    echo "XQuartz is already running."\
+  fi' "$MCP_INSTALLER"
   
   # Run the fixed main installer
   echo "Running the fixed installer..."
