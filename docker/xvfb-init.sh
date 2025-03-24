@@ -4,6 +4,12 @@ set -e
 # Log startup message
 echo "Starting Xvfb and MCP Browser..."
 
+# Kill any existing Xvfb processes
+if [ -f /tmp/.X99-lock ]; then
+    echo "Removing existing X11 lock file"
+    rm -f /tmp/.X99-lock
+fi
+
 # Start Xvfb
 Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset &
 XVFB_PID=$!
@@ -26,7 +32,7 @@ trap "echo 'Shutting down Xvfb and MCP Browser'; kill $XVFB_PID; exit" SIGINT SI
 # Start the MCP browser application
 echo "Starting MCP Browser application..."
 cd /app
-python src/main.py
+python3 src/main.py
 
 # If the application exits, also kill Xvfb
 kill $XVFB_PID 

@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   mcp-browser:
     build: .
     image: neoforge-dev/mcp-browser:latest
     environment:
       - MCP_SECRET=${MCP_SECRET}
-      - SERVER_PORT=7665
+      - SERVER_PORT=8000
       - DISPLAY=:99
     security_opt:
       - apparmor=mcp-browser
@@ -16,13 +14,13 @@ services:
           cpus: "1.5"
           memory: 2G
     ports:
-      - "7665:7665"
+      - "7665:8000"
     volumes:
       - ./src:/app/src
       - /tmp/.X11-unix:/tmp/.X11-unix
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7665/api/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
       interval: 30s
       timeout: 10s
       retries: 3

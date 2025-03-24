@@ -42,7 +42,7 @@
   - ~~Browser-specific MCP tools~~ ✅ COMPLETED
   - ~~DOM manipulation tools~~ ✅ COMPLETED
   - ~~Visual analysis tools~~ ✅ COMPLETED
-  - WebSocket event subscriptions
+  - ~~WebSocket event subscriptions~~ ✅ COMPLETED
 
 - **Verification Agent**:
   - Static analysis integration
@@ -77,6 +77,7 @@ The MCP Browser project is now at version 0.3.0 with all planned frontend analys
 | Accessibility Testing API | ✅ COMPLETED | Multi-standard support, detailed violation reporting, HTML context |
 | Responsive Design Testing API | ✅ COMPLETED | Multi-viewport testing, element comparison, detailed metrics |
 | MCP Protocol Extensions | ✅ COMPLETED | Browser navigation, DOM manipulation, and visual analysis tools |
+| WebSocket Event Subscriptions | ✅ COMPLETED | Real-time browser event monitoring, event filtering, subscription management |
 | Resource Management | 🔄 PLANNED | Browser instance pooling, memory optimization |
 | Security Enhancements | 🔄 PLANNED | Network isolation, rate limiting, input validation |
 | API Documentation | ✅ COMPLETED | Core documentation with examples |
@@ -172,7 +173,8 @@ The following features are planned for future development:
 ## Known Issues
 
 - ~~WebSocket event subscription failing with dependency errors~~ - FIXED: Added fallback mechanism for colorama
-- ~~WebSocket endpoint /ws/browser/events missing~~ - FIXED: Added endpoint to test_websocket.py
+- ~~WebSocket endpoint /ws/browser/events missing~~ - FIXED: Added endpoint to main.py
+- ~~Port configuration mismatch between Docker and test scripts~~ - FIXED: Updated test scripts to use correct port mappings
 - High memory usage when processing very large web pages
 - Occasional timeout on complex sites with many embedded resources
 - Need to implement better error handling for network failures
@@ -180,7 +182,7 @@ The following features are planned for future development:
 
 ## Next Milestone
 
-Version 0.4.0 will focus on implementing Resource Management improvements and WebSocket event subscriptions.
+Version 0.4.0 will focus on implementing Resource Management improvements.
 
 ## Progress Status
 
@@ -207,7 +209,7 @@ The current focus is on implementing and testing the core browser analysis APIs:
 6. MCP protocol extensions - ✅ COMPLETED
 
 Now shifting focus to:
-1. WebSocket event subscriptions
+1. ~~WebSocket event subscriptions~~ ✅ COMPLETED
 2. Resource management improvements
 3. Enhanced security features
 
@@ -230,7 +232,8 @@ Now shifting focus to:
 
 - **April 2024**: Complete frontend analysis features (screenshot, DOM, CSS analysis) ✅ COMPLETED
 - **April 2024**: Complete MCP protocol integration ✅ COMPLETED
-- **May 2024**: Implement WebSocket event subscriptions and verification agent functionality
+- **May 2024**: Implement WebSocket event subscriptions ✅ COMPLETED 
+- **May 2024**: Implement verification agent functionality
 - **May 2024**: Implement monitoring and metrics collection
 - **June 2024**: Enhance developer experience with documentation and CLI tools
 - **June 2024**: Production readiness with comprehensive security and testing
@@ -244,7 +247,11 @@ Now shifting focus to:
 - Data extraction (extract text, screenshot)
 - JavaScript execution in the browser context
 - MCP Protocol Extensions
-- WebSocket event subscriptions for real-time browser event monitoring
+- WebSocket event subscriptions for real-time browser event monitoring:
+  - Subscription management (subscribe, unsubscribe, list)
+  - Event filtering by type and URL pattern
+  - Real-time event delivery
+  - Graceful error handling for missing dependencies
 - Test utilities for both API and WebSocket features
 
 ## Current Status
