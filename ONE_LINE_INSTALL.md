@@ -1,8 +1,8 @@
 # MCP Browser One-Line Installation
 
-## Mac Mini Setup
+## Mac Setup
 
-To set up MCP Browser on your Mac Mini with browser visualization for AI agents, run this command:
+To set up MCP Browser on your Mac with browser visualization for AI agents, run this command:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/neoforge-dev/mcp-browser/main/install_one_line.sh | bash
@@ -21,9 +21,24 @@ This command:
 
 ## Requirements
 
-- Mac Mini or any Mac running macOS
+- Mac running macOS
 - Internet connection
 - Administrator access
+
+## Troubleshooting XQuartz Issues
+
+If you encounter issues with XQuartz not starting properly during installation:
+
+1. The installer will attempt to start XQuartz in several ways:
+   - First by checking if it's already running
+   - Then by trying to start it directly using the binary
+   - Finally by opening the application
+
+2. If automatic startup fails, you'll be prompted to start XQuartz manually:
+   - Try running: `/Applications/Utilities/XQuartz.app/Contents/MacOS/X11`
+   - Or open XQuartz from your Applications folder
+
+3. Once XQuartz is running, press Enter to continue with the installation
 
 ## For iOS Development
 
@@ -39,7 +54,7 @@ If you prefer manual setup, you can:
 
 1. Clone the repository: `git clone https://github.com/neoforge-dev/mcp-browser.git`
 2. Navigate to the directory: `cd mcp-browser`
-3. Run the installer: `./install_mcp_browser.sh`
+3. Run the installer: `./install.sh`
 
 ## Viewing and Testing
 

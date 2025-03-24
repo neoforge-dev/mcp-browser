@@ -16,6 +16,41 @@ A headless browser interface for the Model Control Protocol (MCP).
 - [uv](https://github.com/astral-sh/uv) for dependency management
 - Docker (for containerized usage)
 
+## Installation
+
+### One-Line Installation
+
+To install MCP Browser on your Mac with one command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/neoforge-dev/mcp-browser/main/install_one_line.sh | bash
+```
+
+This command will download and run the installer with proper line ending handling to avoid common issues.
+
+### Manual Installation
+
+For manual installation:
+
+1. Clone this repository
+2. Run the installer script:
+
+```bash
+git clone https://github.com/neoforge-dev/mcp-browser.git
+cd mcp-browser
+./install.sh
+```
+
+### XQuartz Requirements
+
+MCP Browser requires XQuartz (X11) for proper visualization. The installer will:
+
+1. Check if XQuartz is already installed and install it if needed
+2. Attempt to start the X11 server in various ways
+3. Prompt you to start it manually if automatic methods fail
+
+If you encounter issues, see the [Troubleshooting XQuartz Issues](ONE_LINE_INSTALL.md#troubleshooting-xquartz-issues) section.
+
 ## Local Development
 
 ### Setup with uv

@@ -8,7 +8,7 @@ set -e
 # Configuration variables
 REPO="neoforge-dev/mcp-browser"
 BRANCH="main"
-INSTALLER_FILE="install_mcp_browser.sh"
+INSTALLER_FILE="install.sh"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}/${INSTALLER_FILE}"
 
 # Check if running on Mac
@@ -22,7 +22,7 @@ echo "========================================"
 echo "      MCP Browser One-Line Installer"
 echo "========================================"
 echo ""
-echo "This will install MCP Browser on your Mac Mini"
+echo "This will install MCP Browser on your Mac"
 echo "with visualization support for AI agents."
 echo ""
 
@@ -40,9 +40,9 @@ if ! command -v brew &> /dev/null; then
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# Download and run the installer
+# Download and run the installer with line ending fixes
 echo "Downloading and running MCP Browser installer..."
-curl -sSL "$GITHUB_RAW_URL" -o /tmp/install_mcp_browser.sh
+curl -sSL "$GITHUB_RAW_URL" | tr -d '\r' > /tmp/install_mcp_browser.sh
 chmod +x /tmp/install_mcp_browser.sh
 
 # Run the installer

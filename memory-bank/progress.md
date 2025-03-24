@@ -66,123 +66,64 @@
 
 ## Current Status
 
-The MCP Browser project is now at version 0.3.0 with all planned frontend analysis APIs and MCP Protocol Extensions complete. The project now provides comprehensive tools for AI-assisted web testing and analysis.
+**Version:** 0.4.0
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Core Browser Infrastructure | ✅ COMPLETED | Server setup, Docker containerization, process management |
-| Screenshot Capture API | ✅ COMPLETED | Multi-viewport screenshots, format options, timing control |
-| DOM Extraction API | ✅ COMPLETED | Full or partial DOM extraction, selector support, processing options |
-| CSS Analysis API | ✅ COMPLETED | Style property extraction, accessibility checks, positioning information |
-| Accessibility Testing API | ✅ COMPLETED | Multi-standard support, detailed violation reporting, HTML context |
-| Responsive Design Testing API | ✅ COMPLETED | Multi-viewport testing, element comparison, detailed metrics |
-| MCP Protocol Extensions | ✅ COMPLETED | Browser navigation, DOM manipulation, and visual analysis tools |
-| WebSocket Event Subscriptions | ✅ COMPLETED | Real-time browser event monitoring, event filtering, subscription management |
-| Resource Management | 🔄 PLANNED | Browser instance pooling, memory optimization |
-| Security Enhancements | 🔄 PLANNED | Network isolation, rate limiting, input validation |
-| API Documentation | ✅ COMPLETED | Core documentation with examples |
-| Testing Framework | ✅ COMPLETED | Automated tests for all endpoints |
+The MCP Browser now supports all core protocol extensions, WebSocket event subscriptions, and has been successfully installed on a Mac Mini. The event subscription system allows clients to subscribe to various browser events (PAGE, DOM, CONSOLE, NETWORK) and receive real-time notifications when these events occur.
 
-## What Works
+Key components implemented:
+- HTTP API for browser control and interaction
+- WebSocket endpoint for real-time browser events 
+- Event subscription management endpoints
+- Event filtering by URL pattern and page ID
+- Comprehensive documentation of the WebSocket events feature
+- Robust installation with XQuartz display server integration
 
-All core API functionality is implemented and working:
+## Installation Status
 
-1. **Screenshot Capture API** (`/api/screenshots/capture`):
-   - Full-page and viewport screenshots
-   - Customizable viewport sizes
-   - Multiple format options (PNG/JPEG)
-   - Wait timing controls
+We have successfully addressed installation issues with XQuartz (X11) display server:
+- Identified issues with XQuartz app launching on Mac Mini
+- Created more robust approach to starting X11 server
+- Implemented direct binary execution as a fallback
+- Successfully completed installation and testing
 
-2. **DOM Extraction API** (`/api/dom/extract`):
-   - Full page or element-specific extraction
-   - Selector-based targeting
-   - Optional inclusion of attributes and styles
-   - Source HTML or processed JSON formats
+However, we now have several redundant installation scripts that need to be consolidated:
+- `install_one_line.sh`: One-line installation launcher
+- `install_mcp_browser.sh`: Main installer script
+- `install_helper.sh`: Helper script to fix line endings and XQuartz issues
+- `simple_install.sh`: Simplified installer that skips XQuartz setup
 
-3. **CSS Analysis API** (`/api/css/analyze`):
-   - Detailed style property extraction
-   - Accessibility info for color contrast
-   - Element visibility and positioning data
-   - Customizable property selection
+Our cleanup plan includes:
+1. Consolidate into one robust main installer script
+2. Update the one-line launcher with better error handling
+3. Remove redundant scripts
+4. Update documentation to reflect changes
 
-4. **Accessibility Testing API** (`/api/accessibility/test`):
-   - Multiple standards support (WCAG, Section 508)
-   - Element-specific testing with selectors
-   - Detailed violation, warning, and incomplete results
-   - HTML context for better debugging
+## What's Left to Build
 
-5. **Responsive Design Testing API** (`/api/responsive/test`):
-   - Multi-viewport testing
-   - Element comparison across viewports
-   - Media query analysis
-   - Touch target size validation
-   - Screenshots at each viewport size
-   - Detailed metrics and issue reporting
-
-6. **MCP Protocol Extensions**:
-   - Browser Navigation Tools:
-     - Page navigation with URL and wait options
-     - Back/forward navigation
-     - Page refreshing
-     - URL and title retrieval
-   - DOM Manipulation Tools:
-     - Element clicking
-     - Text input
-     - Form filling
-     - Dropdown selection
-     - Element visibility checking
-     - Waiting for selectors
-   - Visual Analysis Tools:
-     - Element and page screenshots
-     - Text extraction
-     - JavaScript evaluation
-
-7. **Development Infrastructure**:
-   - Docker containerization
-   - Test automation
-   - Output organization
-   - Execution scripts
-
-## What's Left
-
-The following features are planned for future development:
-
-1. **MCP Protocol Extensions**:
-   - ~~Extended browser communication protocol~~ ✅ COMPLETED
-   - WebSocket support for real-time updates
-   - Event-driven architecture for monitoring
-
-2. **Resource Management Improvements**:
-   - Browser instance pooling
-   - Memory usage optimization
-   - Execution time improvements
-   - Parallel processing capabilities
-
-3. **Security Enhancements**:
-   - Network isolation
-   - Rate limiting
-   - Input validation
-   - Sandboxed execution
-
-4. **Additional API Capabilities**:
-   - Performance metrics capture
-   - Network traffic analysis
-   - Interactive testing capabilities
-   - Advanced state management
+- Script cleanup and consolidation
+- Browser context management (multiple browser instances)
+- Additional DOM manipulation commands
+- Network interception and modification
+- Cookie and storage management
+- Performance metrics collection
+- Integration with external tools and services
 
 ## Known Issues
 
-- ~~WebSocket event subscription failing with dependency errors~~ - FIXED: Added fallback mechanism for colorama
-- ~~WebSocket endpoint /ws/browser/events missing~~ - FIXED: Added endpoint to main.py
-- ~~Port configuration mismatch between Docker and test scripts~~ - FIXED: Updated test scripts to use correct port mappings
-- High memory usage when processing very large web pages
-- Occasional timeout on complex sites with many embedded resources
-- Need to implement better error handling for network failures
-- Docker environment may require adjustment for different host systems
+- Multiple redundant installation scripts causing confusion
+- WebSocket connection might drop if the browser is heavily loaded
+- Some edge cases in event filtering need to be handled
+- Better error reporting for failed subscriptions
+- Performance optimization for high-volume event broadcasting
 
-## Next Milestone
+## Next Development Priorities
 
-Version 0.4.0 will focus on implementing Resource Management improvements.
+1. Clean up and consolidate installation scripts
+2. Add browser context management for multi-session support
+3. Implement additional DOM manipulation commands
+4. Add network interception capabilities
+5. Add comprehensive error handling throughout the application
+6. Create a client library in Python for easier integration
 
 ## Progress Status
 
