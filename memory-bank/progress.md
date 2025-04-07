@@ -2,128 +2,111 @@
 
 ## What Works
 
-- **Screenshot Capture API**: Successfully implemented the `/api/screenshots/capture` endpoint that captures screenshots of web pages with configurable options for viewport size, image format, and quality.
+- **Core Frontend Analysis APIs**:
+  - Screenshot Capture API (`/api/screenshots/capture`)
+  - DOM Extraction API (`/api/dom/extract`)
+  - CSS Analysis API (`/api/css/analyze`)
+  - Accessibility Testing API (`/api/accessibility/test`)
+  - Responsive Design Testing API (`/api/responsive/test`)
 
-- **DOM Extraction API**: Successfully implemented the `/api/dom/extract` endpoint that provides detailed DOM structure analysis with support for CSS selector targeting, style computation, and attribute extraction.
+- **MCP Protocol Extensions**:
+  - Browser Navigation Tools (navigate, back, forward, refresh, get URL, get title)
+  - DOM Manipulation Tools (click, type, select, fill form, check visibility, wait for selector, evaluate Javascript)
+  - Visual Analysis Tools (screenshot, extract text, evaluate Javascript)
 
-- **CSS Analysis API**: Successfully implemented the `/api/css/analyze` endpoint that extracts and analyzes CSS properties of selected elements with optional accessibility checks.
+- **WebSocket Event Subscriptions**:
+  - Real-time event streaming for PAGE, DOM, CONSOLE, and NETWORK events
+  - Subscription management (subscribe, unsubscribe, list)
+  - Event filtering by URL pattern and page ID
 
-- **Accessibility Testing API**: Successfully implemented the `/api/accessibility/test` endpoint that analyzes web pages for accessibility issues following various standards like WCAG and Section 508.
+- **Basic Security**:
+  - AppArmor profiles for Docker containers
+  - Non-root container execution
+  - Basic API authentication
 
-- **Responsive Design Testing API**: Successfully implemented the `/api/responsive/test` endpoint that analyzes web pages across different viewport sizes to identify responsive design issues and compare element behavior.
-
-- **MCP Protocol Extensions**: Successfully implemented the API endpoints for browser interaction including browser navigation (navigate, back, forward, refresh), DOM manipulation (click, type, select, check visibility, wait for selectors), and visual analysis (screenshot, extract text, evaluate JavaScript).
-
-- **Testing Framework**: Created a basic testing framework with script to verify API functionality.
-
-- **Docker Containerization**: The project successfully runs in a Docker container with appropriate security profiles.
-
-- **Xvfb Integration**: Virtual X server is configured and functioning correctly for headless browser operation.
-
-- **Playwright Integration**: Playwright browser automation is correctly set up and can control browser instances.
-
-- **FastAPI Server**: Basic server is operational with API endpoints and WebSocket support.
-
-- **Environment Configuration**: Environment variable handling is implemented with .env file support.
-
-- **Build Scripts**: Basic build and run scripts are operational.
-
-- **Security Profiles**: Initial AppArmor profiles are in place for container security.
-
-- **Documentation**: Core documentation structure is established with Memory Bank approach.
+- **Infrastructure**:
+  - Docker containerization
+  - Xvfb virtual display
+  - Playwright automation engine
+  - FastAPI server
+  - Environment configuration
+  - Basic build and run scripts
 
 ## What's Left to Build
 
-- **Additional Frontend Analysis Features**:
-  - ~~Accessibility testing API~~ ✅ COMPLETED
-  - ~~Responsive design testing API~~ ✅ COMPLETED
+### High Priority (Must Have)
 
-- **MCP Protocol Extensions**:
-  - ~~Browser-specific MCP tools~~ ✅ COMPLETED
-  - ~~DOM manipulation tools~~ ✅ COMPLETED
-  - ~~Visual analysis tools~~ ✅ COMPLETED
-  - ~~WebSocket event subscriptions~~ ✅ COMPLETED
+1. **Resource Management**:
+   - Browser context management for multi-session support
+   - Resource cleanup after API calls
+   - Performance optimization for high-volume events
 
-- **Verification Agent**:
-  - Static analysis integration
-  - Unit test automation
-  - Security checks implementation
+2. **Security Enhancements**:
+   - Rate limiting for API endpoints
+   - Granular AppArmor profiles
+   - Network isolation improvements
 
-- **Monitoring Tools**:
-  - NetData integration
-  - Loki + Grafana setup
-  - cAdvisor integration
+3. **Verification Agent**:
+   - Static analysis integration
+   - Unit test automation
+   - Security checks implementation
 
-- **Developer Experience**:
-  - API documentation
-  - CLI tool
-  - Example scripts
+4. **Monitoring Tools**:
+   - NetData integration
+   - Loki + Grafana setup
+   - cAdvisor integration
 
-- **Enhanced Security**:
-  - Rate limiting
-  - Granular AppArmor profiles
-  - Network isolation
+5. **Developer Experience**:
+   - Comprehensive API documentation with examples
+   - CLI tool for easier interaction
+   - Example scripts and tutorials
+
+### Medium Priority
+
+1. **Network Features**:
+   - Network interception and modification
+   - Cookie and storage management
+   - Performance metrics collection
+
+2. **Testing Framework**:
+   - Comprehensive test coverage
+   - Integration tests
+   - Performance tests
+
+3. **Error Handling**:
+   - Standardized error responses
+   - Better error reporting
+   - Graceful degradation
 
 ## Current Status
 
 **Version:** 0.4.0
 
-The MCP Browser now supports all core protocol extensions, WebSocket event subscriptions, and has been successfully installed on a Mac Mini. The event subscription system allows clients to subscribe to various browser events (PAGE, DOM, CONSOLE, NETWORK) and receive real-time notifications when these events occur.
-
-Key components implemented:
-- HTTP API for browser control and interaction
-- WebSocket endpoint for real-time browser events 
-- Event subscription management endpoints
-- Event filtering by URL pattern and page ID
-- Comprehensive documentation of the WebSocket events feature
-- Robust installation with XQuartz display server integration
-
-## Installation Status
-
-We have successfully addressed installation issues with XQuartz (X11) display server:
-- Identified issues with XQuartz app launching on Mac Mini
-- Created more robust approach to starting X11 server
-- Implemented direct binary execution as a fallback
-- Successfully completed installation and testing
-
-However, we now have several redundant installation scripts that need to be consolidated:
-- `install_one_line.sh`: One-line installation launcher
-- `install_mcp_browser.sh`: Main installer script
-- `install_helper.sh`: Helper script to fix line endings and XQuartz issues
-- `simple_install.sh`: Simplified installer that skips XQuartz setup
-
-Our cleanup plan includes:
-1. Consolidate into one robust main installer script
-2. Update the one-line launcher with better error handling
-3. Remove redundant scripts
-4. Update documentation to reflect changes
-
-## What's Left to Build
-
-- Script cleanup and consolidation
-- Browser context management (multiple browser instances)
-- Additional DOM manipulation commands
-- Network interception and modification
-- Cookie and storage management
-- Performance metrics collection
-- Integration with external tools and services
+The MCP Browser has successfully implemented all core features including frontend analysis APIs, MCP protocol extensions, and WebSocket event subscriptions. The project is now focusing on resource management, security enhancements, and developer experience improvements.
 
 ## Known Issues
 
-- Multiple redundant installation scripts causing confusion
-- WebSocket connection might drop if the browser is heavily loaded
-- Some edge cases in event filtering need to be handled
-- Better error reporting for failed subscriptions
-- Performance optimization for high-volume event broadcasting
+| Issue | Description | Severity | Status |
+|-------|-------------|----------|--------|
+| Browser Resource Management | Need proper cleanup of browser resources after API calls | High | In Progress |
+| Rate Limiting | Missing rate limiting for API endpoints | High | To Address |
+| Network Isolation | Need improved network isolation in Docker | High | To Address |
+| Static Analysis | Missing integration with static analysis tools | High | To Address |
+| Monitoring | No comprehensive monitoring setup | High | To Address |
+| Documentation | API documentation needs examples | Medium | To Address |
+| Error Handling | Need standardized error handling | Medium | To Address |
+| Performance | Event broadcasting needs optimization | Medium | To Address |
 
 ## Next Development Priorities
 
-1. Clean up and consolidate installation scripts
-2. Add browser context management for multi-session support
-3. Implement additional DOM manipulation commands
-4. Add network interception capabilities
-5. Add comprehensive error handling throughout the application
-6. Create a client library in Python for easier integration
+1. Implement browser context management
+2. Add rate limiting and security enhancements
+3. Integrate verification tools
+4. Set up monitoring infrastructure
+5. Enhance developer documentation and tools
+6. Add network interception capabilities
+7. Implement comprehensive error handling
+8. Create client library for easier integration
 
 ## Progress Status
 
@@ -131,103 +114,20 @@ Our cleanup plan includes:
 - [x] Basic server functionality with FastAPI
 - [x] Playwright integration for browser control
 - [x] WebSocket interface for real-time communication
-- [x] Screenshot capture API endpoint
-- [x] DOM extraction API endpoint
-- [x] CSS analysis API endpoint
-- [x] Accessibility testing API endpoint
-- [x] Responsive design testing API endpoint
-- [x] MCP protocol extensions for browser interaction
-
-## Current Focus
-
-The current focus is on implementing and testing the core browser analysis APIs:
-
-1. Screenshot capture - ✅ COMPLETED
-2. DOM extraction - ✅ COMPLETED
-3. CSS analysis - ✅ COMPLETED
-4. Accessibility testing - ✅ COMPLETED
-5. Responsive design testing - ✅ COMPLETED
-6. MCP protocol extensions - ✅ COMPLETED
-
-Now shifting focus to:
-1. ~~WebSocket event subscriptions~~ ✅ COMPLETED
-2. Resource management improvements
-3. Enhanced security features
-
-## Known Issues
-
-| Issue | Description | Severity | Status |
-|-------|-------------|----------|--------|
-| Browser Resource Management | Need proper cleanup of browser resources after API calls | Medium | In Progress |
-| Error Handling Consistency | Need standardized error handling across all API endpoints | Medium | To Address |
-| MCPClient Implementation | The current MCPClient implementation needs refinement for stability | Medium | To Address |
-| Xvfb on macOS | Xvfb configuration causes issues on macOS development environments | Low | Investigating |
-| WebSocket Connections | Unexpected termination of WebSocket connections under high load | Medium | To Address |
-| Resource Constraints | Current container resource limits may not be optimal | Medium | Need Testing |
-- ~~DOM extraction endpoint failing with Playwright API errors~~ - FIXED
-- ~~CSS analysis endpoint failing with Playwright API errors~~ - FIXED
-- ~~Output files organization~~ - FIXED: All output files now stored in dedicated folders under `/output`
-- Docker image build failing due to issues with Playwright base image
+- [x] Core frontend analysis APIs
+- [x] MCP protocol extensions
+- [x] Basic security measures
+- [ ] Resource management improvements
+- [ ] Enhanced security features
+- [ ] Verification agent implementation
+- [ ] Monitoring setup
+- [ ] Developer experience enhancements
 
 ## Next Major Milestones
 
-- **April 2024**: Complete frontend analysis features (screenshot, DOM, CSS analysis) ✅ COMPLETED
-- **April 2024**: Complete MCP protocol integration ✅ COMPLETED
-- **May 2024**: Implement WebSocket event subscriptions ✅ COMPLETED 
-- **May 2024**: Implement verification agent functionality
-- **May 2024**: Implement monitoring and metrics collection
-- **June 2024**: Enhance developer experience with documentation and CLI tools
-- **June 2024**: Production readiness with comprehensive security and testing
-
-## Working Features
-
-- Browser control via HTTP API
-- HTTP API endpoints for all core browser actions
-- Basic navigation commands (go, back, forward, refresh)
-- DOM interaction (click, check visibility, wait for element)
-- Data extraction (extract text, screenshot)
-- JavaScript execution in the browser context
-- MCP Protocol Extensions
-- WebSocket event subscriptions for real-time browser event monitoring:
-  - Subscription management (subscribe, unsubscribe, list)
-  - Event filtering by type and URL pattern
-  - Real-time event delivery
-  - Graceful error handling for missing dependencies
-- Test utilities for both API and WebSocket features
-
-## Current Status
-
-**Version:** 0.4.0
-
-The MCP Browser now supports all core protocol extensions and WebSocket event subscriptions. The event subscription system allows clients to subscribe to various browser events (PAGE, DOM, CONSOLE, NETWORK) and receive real-time notifications when these events occur.
-
-Key components implemented:
-- HTTP API for browser control and interaction
-- WebSocket endpoint for real-time browser events 
-- Event subscription management endpoints
-- Event filtering by URL pattern and page ID
-- Comprehensive documentation of the WebSocket events feature
-
-## What's Left to Build
-
-- Browser context management (multiple browser instances)
-- Additional DOM manipulation commands
-- Network interception and modification
-- Cookie and storage management
-- Performance metrics collection
-- Integration with external tools and services
-
-## Known Issues
-
-- WebSocket connection might drop if the browser is heavily loaded
-- Some edge cases in event filtering need to be handled
-- Better error reporting for failed subscriptions
-- Performance optimization for high-volume event broadcasting
-
-## Next Development Priorities
-
-1. Add browser context management for multi-session support
-2. Implement additional DOM manipulation commands
-3. Add network interception capabilities
-4. Add comprehensive error handling throughout the application
-5. Create a client library in Python for easier integration 
+- **April 2024**: Complete resource management improvements
+- **May 2024**: Implement security enhancements
+- **May 2024**: Integrate verification tools
+- **June 2024**: Set up monitoring infrastructure
+- **June 2024**: Enhance developer experience
+- **July 2024**: Production readiness with comprehensive testing 

@@ -12,11 +12,13 @@ import json
 import time
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, status, Body
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, status, Body, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from fastapi.middleware.base import BaseHTTPMiddleware
+from rate_limiter import RateLimiter
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +58,22 @@ class BrowserType(BrowserSelector):
     text: str
     delay: Optional[int] = 0
 
+# Initialize rate limiter
+rate_limiter = RateLimiter()
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Middleware to add rate limit headers to responses"""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Add rate limit headers if present
+        if hasattr(request.state, "rate_limit_headers"):
+            for name, value in request.state.rate_limit_headers.items():
+                response.headers[name] = value
+        
+        return response
+
 # Define lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -68,6 +86,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize app state here
     
     logger.info("MCP Browser server started")
+    
+    # Add rate limit middleware
+    app.add_middleware(RateLimitMiddleware)
     
     yield  # Run the application
     
@@ -147,6 +168,7 @@ async def get_user_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 @app.post("/api/browser/navigate")
+@rate_limiter.limit("50/minute", exempt_with_token=True)
 async def navigate(params: BrowserNavigation, current_user: User = Depends(get_current_active_user)):
     """Navigate to URL"""
     logger.info(f"Navigating to {params.url}")
@@ -184,6 +206,7 @@ async def type_text(params: BrowserType, current_user: User = Depends(get_curren
 
 # WebSocket endpoints
 @app.websocket("/ws")
+@rate_limiter.limit("100/minute", exempt_with_token=True)
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication"""
     await websocket.accept()
@@ -197,6 +220,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close()
 
 @app.websocket("/ws/browser/events")
+@rate_limiter.limit("100/minute", exempt_with_token=True)
 async def websocket_browser_events(websocket: WebSocket):
     """WebSocket endpoint for browser event subscriptions"""
     await websocket.accept()

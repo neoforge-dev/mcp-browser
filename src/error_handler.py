@@ -21,40 +21,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger("error-handler")
 
-class ErrorCode(enum.Enum):
-    """Standard error codes for the application"""
+class ErrorCode(str, enum.Enum):
+    """Error codes for MCP Browser exceptions"""
     
-    # Authentication errors (1000-1099)
-    AUTH_INVALID_CREDENTIALS = 1000
-    AUTH_TOKEN_EXPIRED = 1001
-    AUTH_INVALID_TOKEN = 1002
-    AUTH_INSUFFICIENT_PERMISSIONS = 1003
-    AUTH_USER_DISABLED = 1004
+    # Resource Management Errors
+    RESOURCE_POOL_EXHAUSTED = "RESOURCE_POOL_EXHAUSTED"
+    RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
+    RESOURCE_LIMIT_EXCEEDED = "RESOURCE_LIMIT_EXCEEDED"
+    RESOURCE_RECOVERY_FAILED = "RESOURCE_RECOVERY_FAILED"
+    RESOURCE_CLEANUP_FAILED = "RESOURCE_CLEANUP_FAILED"
+    RESOURCE_MONITOR_ERROR = "RESOURCE_MONITOR_ERROR"
     
-    # Browser operation errors (2000-2099)
-    BROWSER_NAVIGATION_FAILED = 2000
-    BROWSER_TIMEOUT = 2001
-    BROWSER_ELEMENT_NOT_FOUND = 2002
-    BROWSER_EXECUTION_FAILED = 2003
-    BROWSER_PAGE_CRASHED = 2004
+    # Browser Management Errors
+    BROWSER_INITIALIZATION_FAILED = "BROWSER_INITIALIZATION_FAILED"
+    BROWSER_CLEANUP_FAILED = "BROWSER_CLEANUP_FAILED"
+    BROWSER_RECOVERY_FAILED = "BROWSER_RECOVERY_FAILED"
+    BROWSER_PROCESS_ERROR = "BROWSER_PROCESS_ERROR"
+    CONTEXT_CREATION_FAILED = "CONTEXT_CREATION_FAILED"
+    CONTEXT_CLEANUP_FAILED = "CONTEXT_CLEANUP_FAILED"
+    CONTEXT_RECOVERY_FAILED = "CONTEXT_RECOVERY_FAILED"
     
-    # Resource management errors (3000-3099)
-    RESOURCE_NOT_FOUND = 3000
-    RESOURCE_POOL_EXHAUSTED = 3001
-    RESOURCE_ALREADY_EXISTS = 3002
-    RESOURCE_LIMIT_EXCEEDED = 3003
+    # Page Management Errors
+    PAGE_CREATION_FAILED = "PAGE_CREATION_FAILED"
+    PAGE_NAVIGATION_FAILED = "PAGE_NAVIGATION_FAILED"
+    PAGE_TIMEOUT = "PAGE_TIMEOUT"
+    PAGE_ERROR = "PAGE_ERROR"
     
-    # Input validation errors (4000-4099)
-    VALIDATION_ERROR = 4000
-    INVALID_URL = 4001
-    INVALID_SELECTOR = 4002
-    INVALID_PARAMETER = 4003
+    # Network Errors
+    NETWORK_ERROR = "NETWORK_ERROR"
+    CONNECTION_ERROR = "CONNECTION_ERROR"
+    TIMEOUT_ERROR = "TIMEOUT_ERROR"
     
-    # System errors (5000-5099)
-    INTERNAL_ERROR = 5000
-    DEPENDENCY_ERROR = 5001
-    NETWORK_ERROR = 5002
-    DATABASE_ERROR = 5003
+    # Authentication Errors
+    AUTH_REQUIRED = "AUTH_REQUIRED"
+    AUTH_FAILED = "AUTH_FAILED"
+    AUTH_EXPIRED = "AUTH_EXPIRED"
+    
+    # Permission Errors
+    PERMISSION_DENIED = "PERMISSION_DENIED"
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+    
+    # General Errors
+    INVALID_REQUEST = "INVALID_REQUEST"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+    NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
 
 class ErrorDetail(BaseModel):
     """Detailed error information"""
@@ -72,48 +82,54 @@ class ErrorResponse(BaseModel):
 # Map error codes to HTTP status codes
 ERROR_STATUS_CODES = {
     # Authentication errors
-    ErrorCode.AUTH_INVALID_CREDENTIALS: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.AUTH_TOKEN_EXPIRED: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.AUTH_INVALID_TOKEN: status.HTTP_401_UNAUTHORIZED,
-    ErrorCode.AUTH_INSUFFICIENT_PERMISSIONS: status.HTTP_403_FORBIDDEN,
-    ErrorCode.AUTH_USER_DISABLED: status.HTTP_403_FORBIDDEN,
+    ErrorCode.AUTH_REQUIRED: status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.AUTH_FAILED: status.HTTP_401_UNAUTHORIZED,
+    ErrorCode.AUTH_EXPIRED: status.HTTP_401_UNAUTHORIZED,
     
     # Browser operation errors
-    ErrorCode.BROWSER_NAVIGATION_FAILED: status.HTTP_400_BAD_REQUEST,
-    ErrorCode.BROWSER_TIMEOUT: status.HTTP_408_REQUEST_TIMEOUT,
-    ErrorCode.BROWSER_ELEMENT_NOT_FOUND: status.HTTP_404_NOT_FOUND,
-    ErrorCode.BROWSER_EXECUTION_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    ErrorCode.BROWSER_PAGE_CRASHED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.PAGE_NAVIGATION_FAILED: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.PAGE_TIMEOUT: status.HTTP_408_REQUEST_TIMEOUT,
+    ErrorCode.PAGE_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
     
     # Resource management errors
     ErrorCode.RESOURCE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.RESOURCE_POOL_EXHAUSTED: status.HTTP_503_SERVICE_UNAVAILABLE,
-    ErrorCode.RESOURCE_ALREADY_EXISTS: status.HTTP_409_CONFLICT,
     ErrorCode.RESOURCE_LIMIT_EXCEEDED: status.HTTP_429_TOO_MANY_REQUESTS,
+    ErrorCode.RESOURCE_RECOVERY_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.RESOURCE_CLEANUP_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.RESOURCE_MONITOR_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    
+    # Browser operation errors
+    ErrorCode.BROWSER_INITIALIZATION_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.BROWSER_CLEANUP_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.BROWSER_RECOVERY_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.BROWSER_PROCESS_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.CONTEXT_CREATION_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.CONTEXT_CLEANUP_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ErrorCode.CONTEXT_RECOVERY_FAILED: status.HTTP_500_INTERNAL_SERVER_ERROR,
     
     # Input validation errors
-    ErrorCode.VALIDATION_ERROR: status.HTTP_400_BAD_REQUEST,
-    ErrorCode.INVALID_URL: status.HTTP_400_BAD_REQUEST,
-    ErrorCode.INVALID_SELECTOR: status.HTTP_400_BAD_REQUEST,
-    ErrorCode.INVALID_PARAMETER: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.INVALID_REQUEST: status.HTTP_400_BAD_REQUEST,
     
     # System errors
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    ErrorCode.DEPENDENCY_ERROR: status.HTTP_502_BAD_GATEWAY,
+    ErrorCode.NOT_IMPLEMENTED: status.HTTP_501_NOT_IMPLEMENTED,
+    
+    # Network errors
     ErrorCode.NETWORK_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
-    ErrorCode.DATABASE_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR
+    ErrorCode.CONNECTION_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ErrorCode.TIMEOUT_ERROR: status.HTTP_408_REQUEST_TIMEOUT
 }
 
 class MCPBrowserException(Exception):
     """Custom exception for MCP Browser application"""
     
     def __init__(
-        self, 
+        self,
         error_code: ErrorCode,
-        message: str = None,
-        status_code: int = None,
-        details: List[ErrorDetail] = None,
-        original_exception: Exception = None
+        message: str,
+        original_exception: Optional[Exception] = None,
+        details: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize the exception
@@ -121,17 +137,13 @@ class MCPBrowserException(Exception):
         Args:
             error_code: Error code from ErrorCode enum
             message: Error message
-            status_code: HTTP status code (overrides the default for the error code)
-            details: List of error details
             original_exception: The original exception that caused this error
+            details: Additional details about the error
         """
         self.error_code = error_code
         self.message = message or error_code.name
-        self.status_code = status_code or ERROR_STATUS_CODES.get(
-            error_code, status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-        self.details = details or []
         self.original_exception = original_exception
+        self.details = details or {}
         
         # Log the error with traceback if there was an original exception
         if original_exception:
@@ -152,10 +164,10 @@ class MCPBrowserException(Exception):
             ErrorResponse object
         """
         return ErrorResponse(
-            error_code=self.error_code.value,
+            error_code=ERROR_STATUS_CODES.get(self.error_code, status.HTTP_500_INTERNAL_SERVER_ERROR),
             message=self.message,
-            status_code=self.status_code,
-            details=self.details
+            status_code=ERROR_STATUS_CODES.get(self.error_code, status.HTTP_500_INTERNAL_SERVER_ERROR),
+            details=[ErrorDetail(field="error_code", message=str(self.error_code))]
         )
     
     def to_http_exception(self) -> HTTPException:
@@ -167,41 +179,33 @@ class MCPBrowserException(Exception):
         """
         response = self.to_response()
         return HTTPException(
-            status_code=self.status_code,
+            status_code=ERROR_STATUS_CODES.get(self.error_code, status.HTTP_500_INTERNAL_SERVER_ERROR),
             detail=response.dict()
         )
 
 class RetryConfig:
-    """Configuration for retry mechanism"""
+    """Configuration for retry behavior"""
     
     def __init__(
         self,
         max_retries: int = 3,
-        initial_delay: float = 1.0,
-        max_delay: float = 30.0,
-        backoff_factor: float = 2.0,
-        retryable_errors: List[ErrorCode] = None
+        delay: float = 1.0,
+        backoff: float = 2.0,
+        exceptions: Optional[List[type]] = None
     ):
         """
         Initialize retry configuration
         
         Args:
             max_retries: Maximum number of retry attempts
-            initial_delay: Initial delay in seconds before the first retry
-            max_delay: Maximum delay in seconds between retries
-            backoff_factor: Multiplier for the delay between retries
-            retryable_errors: List of error codes that should be retried
+            delay: Initial delay in seconds before the first retry
+            backoff: Multiplier for the delay between retries
+            exceptions: List of exception types that should be retried
         """
         self.max_retries = max_retries
-        self.initial_delay = initial_delay
-        self.max_delay = max_delay
-        self.backoff_factor = backoff_factor
-        self.retryable_errors = retryable_errors or [
-            ErrorCode.BROWSER_TIMEOUT,
-            ErrorCode.NETWORK_ERROR,
-            ErrorCode.RESOURCE_POOL_EXHAUSTED,
-            ErrorCode.DEPENDENCY_ERROR
-        ]
+        self.delay = delay
+        self.backoff = backoff
+        self.exceptions = exceptions or [Exception]
 
 # Default retry configuration
 DEFAULT_RETRY_CONFIG = RetryConfig()
@@ -209,123 +213,111 @@ DEFAULT_RETRY_CONFIG = RetryConfig()
 # Type variable for return type
 T = TypeVar('T')
 
-async def with_retry(
-    func: Callable[..., Any],
-    *args,
-    retry_config: RetryConfig = DEFAULT_RETRY_CONFIG,
-    **kwargs
-) -> Any:
+def with_retry(config: Optional[RetryConfig] = None):
     """
-    Execute a function with retry logic
+    Decorator for retrying operations that may fail
     
     Args:
-        func: Function to execute
-        *args: Positional arguments for the function
-        retry_config: Retry configuration
-        **kwargs: Keyword arguments for the function
-        
-    Returns:
-        Result of the function
-        
-    Raises:
-        MCPBrowserException: If all retries fail
+        config: Retry configuration. If None, uses DEFAULT_RETRY_CONFIG
     """
-    retries = 0
-    last_exception = None
+    if config is None:
+        config = DEFAULT_RETRY_CONFIG
     
-    while retries <= retry_config.max_retries:
-        try:
-            return await func(*args, **kwargs)
-        except MCPBrowserException as e:
-            # Only retry for specified error codes
-            if e.error_code not in retry_config.retryable_errors:
-                raise
-                
-            last_exception = e
-            retries += 1
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            delay = config.delay
             
-            if retries > retry_config.max_retries:
-                break
-                
-            # Calculate delay with exponential backoff
-            delay = min(
-                retry_config.initial_delay * (retry_config.backoff_factor ** (retries - 1)),
-                retry_config.max_delay
-            )
+            for attempt in range(config.max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except tuple(config.exceptions) as e:
+                    last_exception = e
+                    if attempt < config.max_retries - 1:
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed, retrying in {delay:.1f}s: {str(e)}"
+                        )
+                        await asyncio.sleep(delay)
+                        delay *= config.backoff
+                    else:
+                        logger.error(
+                            f"All {config.max_retries} attempts failed: {str(e)}"
+                        )
             
-            logger.warning(
-                f"Retry {retries}/{retry_config.max_retries} for error {e.error_code.name} "
-                f"after {delay:.2f}s delay"
-            )
-            
-            await asyncio.sleep(delay)
-            
-        except Exception as e:
-            # Wrap unexpected exceptions
-            error = MCPBrowserException(
-                error_code=ErrorCode.INTERNAL_ERROR,
-                message=f"Unexpected error: {str(e)}",
-                original_exception=e
-            )
-            
-            last_exception = error
-            retries += 1
-            
-            if retries > retry_config.max_retries:
-                break
-                
-            # Calculate delay with exponential backoff
-            delay = min(
-                retry_config.initial_delay * (retry_config.backoff_factor ** (retries - 1)),
-                retry_config.max_delay
-            )
-            
-            logger.warning(
-                f"Retry {retries}/{retry_config.max_retries} for unexpected error "
-                f"after {delay:.2f}s delay"
-            )
-            
-            await asyncio.sleep(delay)
-    
-    # If we get here, all retries failed
-    if last_exception:
-        # Update the message to indicate retry failure
-        if isinstance(last_exception, MCPBrowserException):
-            last_exception.message = f"Failed after {retries} retries: {last_exception.message}"
+            raise last_exception
         
-        raise last_exception
+        return wrapper
     
-    # This should not happen but just in case
-    raise MCPBrowserException(
-        error_code=ErrorCode.INTERNAL_ERROR,
-        message=f"Failed after {retries} retries with no specific error"
-    )
+    return decorator
 
-def handle_exceptions(func):
+def handle_exceptions(func: Callable):
     """
-    Decorator to handle exceptions in async functions
+    Decorator for standardized exception handling
     
     Args:
-        func: Async function to wrap
-        
-    Returns:
-        Wrapped function
+        func: The function to wrap
     """
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
         except MCPBrowserException as e:
-            # Convert to HTTP exception
-            raise e.to_http_exception()
-        except Exception as e:
-            # Wrap unexpected exceptions
-            error = MCPBrowserException(
-                error_code=ErrorCode.INTERNAL_ERROR,
-                message=f"Unexpected error: {str(e)}",
-                original_exception=e
+            # Log the error with stack trace for debugging
+            logger.error(
+                f"MCPBrowserException: {e.error_code} - {e.message}",
+                exc_info=True
             )
             
-            raise error.to_http_exception()
+            # Convert to HTTP exception
+            status_code = ERROR_STATUS_CODES.get(e.error_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+            if e.error_code in [
+                ErrorCode.AUTH_REQUIRED,
+                ErrorCode.AUTH_FAILED,
+                ErrorCode.AUTH_EXPIRED
+            ]:
+                status_code = status.HTTP_401_UNAUTHORIZED
+            elif e.error_code in [
+                ErrorCode.PERMISSION_DENIED,
+                ErrorCode.RATE_LIMIT_EXCEEDED
+            ]:
+                status_code = status.HTTP_403_FORBIDDEN
+            elif e.error_code in [
+                ErrorCode.RESOURCE_NOT_FOUND,
+                ErrorCode.PAGE_ERROR
+            ]:
+                status_code = status.HTTP_404_NOT_FOUND
+            elif e.error_code in [
+                ErrorCode.INVALID_REQUEST,
+                ErrorCode.PAGE_NAVIGATION_FAILED
+            ]:
+                status_code = status.HTTP_400_BAD_REQUEST
+            elif e.error_code in [
+                ErrorCode.RESOURCE_POOL_EXHAUSTED,
+                ErrorCode.RESOURCE_LIMIT_EXCEEDED
+            ]:
+                status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            
+            raise HTTPException(
+                status_code=status_code,
+                detail={
+                    "error_code": e.error_code,
+                    "message": e.message,
+                    "details": e.details
+                }
+            )
+        except Exception as e:
+            # Log unexpected errors
+            logger.error("Unexpected error:", exc_info=True)
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error_code": ErrorCode.INTERNAL_ERROR,
+                    "message": "An unexpected error occurred",
+                    "details": {"error": str(e)}
+                }
+            )
+    
     return wrapper 
