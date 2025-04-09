@@ -56,31 +56,34 @@ class BrowserInstance:
             logger.info(f"Initializing browser instance {self.id}")
             self._playwright = await async_playwright().start()
             
-            # Launch browser with resource constraints and isolation args
-            launch_args = [
-                '--disable-dev-shm-usage',  # Avoid /dev/shm issues in Docker
-                '--no-sandbox',  # Required for Docker
-                '--disable-gpu',  # Reduce resource usage
-                '--disable-software-rasterizer',  # Reduce memory usage
-                '--disable-extensions',  # Disable extensions
-                f'--js-flags=--max-old-space-size={256}',  # Limit JS heap
-            ]
-            if self.network_isolation:
-                 # Experimental flags, might change based on Chromium version
-                 launch_args.extend([
-                     '--disable-features=NetworkService,NetworkServiceInProcess',
-                     '--disable-background-networking',
-                     '--disable-sync',
-                     '--disable-default-apps',
-                     '--disable-breakpad', # Disable crash reporting
-                     '--disable-component-extensions-with-background-pages',
-                     '--disable-component-update',
-                     '--disable-domain-reliability',
-                     '--disable-client-side-phishing-detection',
-                     '--disable-sync-preferences',
-                     '--enable-strict-mixed-content-checking',
-                     '--use-mock-keychain', # Prevent keychain access
-                 ])
+            # --- DEBUG: Minimize launch args --- 
+            # launch_args = [
+            #     '--disable-dev-shm-usage',  # Avoid /dev/shm issues in Docker
+            #     '--no-sandbox',  # Required for Docker
+            #     '--disable-gpu',  # Reduce resource usage
+            #     '--disable-software-rasterizer',  # Reduce memory usage
+            #     '--disable-extensions',  # Disable extensions
+            #     f'--js-flags=--max-old-space-size={256}',  # Limit JS heap
+            # ]
+            # if self.network_isolation:
+            #      # Experimental flags, might change based on Chromium version
+            #      launch_args.extend([
+            #          '--disable-features=NetworkService,NetworkServiceInProcess',
+            #          '--disable-background-networking',
+            #          '--disable-sync',
+            #          '--disable-default-apps',
+            #          '--disable-breakpad', # Disable crash reporting
+            #          '--disable-component-extensions-with-background-pages',
+            #          '--disable-component-update',
+            #          '--disable-domain-reliability',
+            #          '--disable-client-side-phishing-detection',
+            #          '--disable-sync-preferences',
+            #          '--enable-strict-mixed-content-checking',
+            #          '--use-mock-keychain', # Prevent keychain access
+            #      ])
+            launch_args = ['--no-sandbox'] # Minimal args for debugging
+            logger.warning(f"[DEBUG] Using minimal launch_args: {launch_args}")
+            # --- END DEBUG --- 
 
             self.browser = await self._playwright.chromium.launch(
                 args=launch_args,
@@ -89,16 +92,6 @@ class BrowserInstance:
                 handle_sighup=True
             )
             
-            # Get browser process for monitoring - Removed as browser.process is not available/reliable
-            # if self.browser and hasattr(self.browser, 'process') and self.browser.process:
-            #      try:
-            #           self.process = psutil.Process(self.browser.process.pid)
-            #           logger.info(f"Browser instance {self.id} initialized with PID {self.process.pid}")
-            #      except (psutil.NoSuchProcess, AttributeError) as e:
-            #            logger.warning(f"Could not get process info for browser {self.id}: {e}")
-            #            self.process = None
-            # else:
-            #      logger.warning(f"Browser instance {self.id} started but process info unavailable.")
             logger.info(f"Browser instance {self.id} initialized successfully.")
 
             return self.browser
@@ -222,73 +215,120 @@ class BrowserInstance:
         self.is_closing = True
         logger.info(f"[Browser {self.id}] Starting close process")
         
+        close_error = None
         try:
-            # Close all contexts
+            # Close all contexts first
             context_ids = list(self.contexts.keys())
             if context_ids:
                 logger.debug(f"[Browser {self.id}] Closing {len(context_ids)} contexts: {context_ids}")
                 for context_id in context_ids:
                     try:
-                        logger.debug(f"[Browser {self.id}] Closing context {context_id}")
                         await self.close_context(context_id)
-                        logger.debug(f"[Browser {self.id}] Successfully closed context {context_id}")
                     except Exception as e:
                         logger.error(f"[Browser {self.id}] Error closing context {context_id}: {e}", exc_info=True)
-            else:
-                logger.debug(f"[Browser {self.id}] No contexts to close")
+                        if not close_error: close_error = e # Keep first error
             
-            # Close browser
+            # Close browser with timeout
             if self.browser:
                 logger.debug(f"[Browser {self.id}] Closing browser process")
                 try:
-                    await self.browser.close()
+                    await asyncio.wait_for(self.browser.close(), timeout=5.0) # Added timeout
                     logger.debug(f"[Browser {self.id}] Successfully closed browser process")
+                except asyncio.TimeoutError:
+                    logger.error(f"[Browser {self.id}] Timeout closing browser process")
+                    if not close_error: close_error = asyncio.TimeoutError("Browser close timeout")
                 except Exception as e:
                     logger.error(f"[Browser {self.id}] Error closing browser process: {e}", exc_info=True)
+                    if not close_error: close_error = e
                 finally:
                     self.browser = None
             
-            # Stop playwright
+            # Stop playwright with timeout
             if self._playwright:
                 logger.debug(f"[Browser {self.id}] Stopping playwright")
                 try:
-                    await self._playwright.stop()
+                    await asyncio.wait_for(self._playwright.stop(), timeout=5.0) # Added timeout
                     logger.debug(f"[Browser {self.id}] Successfully stopped playwright")
+                except asyncio.TimeoutError:
+                    logger.error(f"[Browser {self.id}] Timeout stopping playwright")
+                    if not close_error: close_error = asyncio.TimeoutError("Playwright stop timeout")
                 except Exception as e:
                     logger.error(f"[Browser {self.id}] Error stopping playwright: {e}", exc_info=True)
+                    if not close_error: close_error = e
                 finally:
                     self._playwright = None
             
-            logger.info(f"[Browser {self.id}] Close process completed successfully")
+            if close_error:
+                logger.warning(f"[Browser {self.id}] Close process completed with errors.")
+                # Raise the first encountered error after attempting all cleanup steps
+                raise MCPBrowserException(
+                    error_code=ErrorCode.BROWSER_CLEANUP_FAILED,
+                    message=f"Failed to clean up browser resources fully: {str(close_error)}",
+                    original_exception=close_error
+                )
+            else:
+                 logger.info(f"[Browser {self.id}] Close process completed successfully")
             
         except Exception as e:
-            logger.error(f"[Browser {self.id}] Error during close process: {e}", exc_info=True)
-            raise MCPBrowserException(
-                error_code=ErrorCode.BROWSER_CLEANUP_FAILED,
-                message=f"Failed to clean up browser resources: {str(e)}",
-                original_exception=e
-            )
+            # Catch any unexpected error during the close process itself
+            logger.error(f"[Browser {self.id}] Unexpected error during close process: {e}", exc_info=True)
+            if not isinstance(e, MCPBrowserException):
+                 raise MCPBrowserException(
+                    error_code=ErrorCode.BROWSER_CLEANUP_FAILED,
+                    message=f"Unexpected failure during browser cleanup: {str(e)}",
+                    original_exception=e
+                )
+            else:
+                raise e # Re-raise if it's already an MCPBrowserException
 
     async def _handle_route(self, route):
         """Intercept and handle network requests based on isolation rules."""
         request = route.request
         url = request.url
-        domain = url.split('/')[2].split(':')[0] # Extract domain name
+        log_prefix = f"[Browser {self.id}][Route Handler]"
+        logger.debug(f"{log_prefix} Intercepted request to: {url}")
+        
+        try:
+            domain = url.split('/')[2].split(':')[0] # Extract domain name
+            logger.debug(f"{log_prefix} Extracted domain: {domain}")
+        except IndexError:
+            logger.warning(f"{log_prefix} Could not extract domain from URL: {url}. Allowing by default.")
+            try:
+                await route.continue_()
+                logger.debug(f"{log_prefix} Allowed request (no domain) to {url}")
+            except Exception as e:
+                 logger.error(f"{log_prefix} Error continuing request (no domain) to {url}: {e}")
+                 try: await route.abort() # Attempt to abort if continue fails
+                 except: pass
+            return
 
         if domain in self.blocked_domains:
-            logger.warning(f"Blocked request to {domain} (explicitly blocked) in browser {self.id}")
-            await route.abort("blockedbyclient")
+            logger.warning(f"{log_prefix} Blocking request to {domain} (explicitly blocked) for URL: {url}")
+            try:
+                await route.abort("blockedbyclient")
+            except Exception as e:
+                 logger.error(f"{log_prefix} Error aborting blocked request to {url}: {e}")
             return
         
         # If allowed_domains is defined, only allow those domains
         if self.allowed_domains and domain not in self.allowed_domains:
-            logger.warning(f"Blocked request to {domain} (not in allowed list) in browser {self.id}")
-            await route.abort("blockedbyclient")
+            logger.warning(f"{log_prefix} Blocking request to {domain} (not in allowed list) for URL: {url}")
+            try:
+                await route.abort("addressunreachable") # Use a different error code
+            except Exception as e:
+                 logger.error(f"{log_prefix} Error aborting unallowed request to {url}: {e}")
             return
 
-        # Allow the request if it's not blocked and either allowed_domains is empty or the domain is in the list
-        logger.debug(f"Allowed request to {url} in browser {self.id}")
-        await route.continue_()
+        # Allow the request if it passes all checks
+        logger.debug(f"{log_prefix} Allowing request to {url} (Domain: {domain})")
+        try:
+            await route.continue_()
+            logger.debug(f"{log_prefix} Successfully continued request to {url}")
+        except Exception as e:
+             logger.error(f"{log_prefix} Error continuing allowed request to {url}: {e}")
+             # Attempt to abort if continue fails, otherwise it might hang
+             try: await route.abort() 
+             except: pass
 
 class BrowserPool:
     """Manages a pool of browser instances"""
@@ -378,30 +418,49 @@ class BrowserPool:
         }
     
     async def _check_resource_limits(self) -> bool:
-        """Check if system resource usage is within limits."""
+        """Check if system resource usage is within limits. Closes LRU browser if exceeded."""
         metrics = self._get_system_metrics()
         memory_usage = metrics["memory_percent"]
         cpu_usage = metrics["cpu_percent"]
+        limit_exceeded = False
+        lru_browser_id = None
 
         if memory_usage > self.max_memory_percent:
             logger.warning(f"Memory usage high: {memory_usage:.2f}% (Limit: {self.max_memory_percent}%)")
-            await self._close_idle_browsers(force_check=True)
-            # Recheck after cleanup
-            memory_usage = self._get_system_metrics()["memory_percent"]
-            if memory_usage > self.max_memory_percent:
-                logger.error(f"Memory usage still high after cleanup: {memory_usage:.2f}%")
-                return False
+            limit_exceeded = True
         
         if cpu_usage > self.max_cpu_percent:
             logger.warning(f"CPU usage high: {cpu_usage:.2f}% (Limit: {self.max_cpu_percent}%)")
-            await self._close_idle_browsers(force_check=True)
-            # Recheck after cleanup
-            cpu_usage = self._get_system_metrics()["cpu_percent"]
-            if cpu_usage > self.max_cpu_percent:
-                logger.error(f"CPU usage still high after cleanup: {cpu_usage:.2f}%")
-                return False
+            limit_exceeded = True
 
-        return True
+        if limit_exceeded:
+            async with self.lock: # Acquire lock to safely access browsers list
+                if not self.browsers:
+                    logger.warning("Resource limit exceeded but no browsers to close.")
+                    return False # Cannot recover if no browsers exist
+
+                # Find the least recently used browser
+                lru_browser_id = min(self.browsers.keys(), key=lambda bid: self.browsers[bid].last_used)
+                logger.warning(f"Resource limit exceeded. Closing least recently used browser: {lru_browser_id}")
+            
+            # Close the identified browser (outside the main lock to avoid deadlock)
+            try:
+                await self.close_browser(lru_browser_id)
+                # Recheck limits after closing one browser
+                metrics = self._get_system_metrics()
+                memory_usage = metrics["memory_percent"]
+                cpu_usage = metrics["cpu_percent"]
+                if memory_usage > self.max_memory_percent or cpu_usage > self.max_cpu_percent:
+                     logger.error(f"Resource usage still high after closing LRU browser {lru_browser_id}. Mem: {memory_usage:.2f}%, CPU: {cpu_usage:.2f}%")
+                     return False # Still exceeding limits
+                else:
+                     logger.info(f"Resource usage back within limits after closing {lru_browser_id}.")
+                     return True
+            except Exception as e:
+                 logger.error(f"Failed to close LRU browser {lru_browser_id} during resource limit check: {e}", exc_info=True)
+                 return False # Failed to recover
+
+        return True # Limits were not exceeded
     
     async def _close_idle_browsers(self, force_check=False):
         """Closes browser instances that have been idle for too long."""
@@ -413,15 +472,19 @@ class BrowserPool:
                 if not browser.is_closing and not browser.contexts:
                     idle_time = current_time - browser.last_used
                     if idle_time > self.idle_timeout:
-                        logger.info(f"Browser {instance_id} idle for {idle_time:.2f}s, closing")
+                        logger.info(f"Browser {instance_id} idle for {idle_time:.2f}s, scheduling for close")
                         browsers_to_close.append(instance_id)
 
             if browsers_to_close:
-                logger.info(f"Closing {len(browsers_to_close)} idle browsers")
-                await asyncio.gather(
-                    *(self.close_browser(browser_id) for browser_id in browsers_to_close),
-                    return_exceptions=True
-                )
+                logger.info(f"Closing {len(browsers_to_close)} idle browsers sequentially")
+                # Close sequentially for easier debugging
+                for browser_id in browsers_to_close:
+                    logger.debug(f"Closing idle browser {browser_id}...")
+                    try:
+                        await self.close_browser(browser_id)
+                        logger.debug(f"Successfully closed idle browser {browser_id}")
+                    except Exception as e:
+                        logger.error(f"Error closing idle browser {browser_id}: {e}", exc_info=True)
     
     async def _monitor_task(self):
         """Background task to monitor resources and close idle browsers."""
@@ -498,27 +561,32 @@ class BrowserPool:
     async def close_browser(self, browser_id: str):
         """Close a specific browser instance and remove it from the pool."""
         logger.debug(f"[Pool] close_browser called for {browser_id}")
+        browser_closed_successfully = False
         try:
             async with self.lock:
                 if browser_id in self.browsers:
                     browser = self.browsers[browser_id]
                     logger.info(f"[Pool] Found browser {browser_id}. Initiating close...")
                     
-                    # Remove timeout from browser.close()
+                    # Apply timeout specifically to the instance close operation
                     try:
-                        await browser.close()
+                        await asyncio.wait_for(browser.close(), timeout=10.0) # Added timeout
                         logger.debug(f"[Pool] Successfully awaited browser.close() for {browser_id}")
-                    # Removed asyncio.TimeoutError specific handling, rely on generic Exception
+                        browser_closed_successfully = True
+                    except asyncio.TimeoutError:
+                         logger.error(f"[Pool] Timeout during browser.close() for {browser_id}")
+                         # Attempt to force cleanup if possible (may still hang)
                     except Exception as e:
                         logger.error(f"[Pool] Error during browser.close() for {browser_id}: {e}", exc_info=True)
-                        raise # Re-raise to signal cleanup issue for this browser
+                        # Consider the browser potentially problematic, but proceed with removal
                     
+                    # Always remove from tracking, even if close failed/timed out
                     del self.browsers[browser_id]
-                    logger.debug(f"[Pool] Removed browser {browser_id} from pool.")
+                    logger.debug(f"[Pool] Removed browser {browser_id} from pool tracking.")
                 else:
                     logger.warning(f"[Pool] Attempted to close non-existent browser {browser_id}")
         except Exception as e:
-            logger.error(f"[Pool] Error in close_browser for {browser_id}: {e}", exc_info=True)
+            logger.error(f"[Pool] Error in close_browser lock/lookup for {browser_id}: {e}", exc_info=True)
             # Do not re-raise here, allow cleanup loop to continue
 
     def start_monitoring(self):
@@ -531,37 +599,42 @@ class BrowserPool:
     async def cleanup(self):
         """Clean up all browser instances and resources."""
         logger.info("[Pool] Starting cleanup")
+        self._shutting_down = True # Signal monitor to stop
         
         try:
+            # Stop monitoring first
+            if self._monitor_task_handle and not self._monitor_task_handle.done():
+                logger.info("[Pool] Cancelling monitor task...")
+                self._monitor_task_handle.cancel()
+                try:
+                    await asyncio.wait_for(self._monitor_task_handle, timeout=5.0)
+                    logger.info("[Pool] Monitor task cancelled successfully.")
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    logger.warning("[Pool] Monitor task cancellation timed out or already cancelled.")
+                except Exception as e:
+                    logger.error(f"[Pool] Error waiting for monitor task cancellation: {e}")
+            
+            # Now acquire lock and close browsers
             async with self.lock:
-                # Get list of browsers to close
                 browsers_to_close = list(self.browsers.keys())
                 logger.info(f"[Pool] Closing {len(browsers_to_close)} remaining browsers: {browsers_to_close}")
                 
-                # Close each browser with a timeout
                 for browser_id in browsers_to_close:
-                    browser = self.browsers[browser_id]
+                    browser = self.browsers.get(browser_id) # Use .get() for safety
                     if browser:
+                        logger.debug(f"[Pool] Cleaning up browser {browser_id}")
                         try:
-                            await asyncio.wait_for(self.close_browser(browser), timeout=5.0)
+                            # Using close_browser which now has internal timeouts
+                            await asyncio.wait_for(self.close_browser(browser_id), timeout=15.0) # Overall timeout for close_browser
                         except asyncio.TimeoutError:
-                            logger.warning(f"[Pool] Timeout closing browser {browser_id}")
+                            logger.error(f"[Pool] Overall timeout cleaning up browser {browser_id}. Might be stuck.")
                         except Exception as e:
-                            logger.error(f"[Pool] Error closing browser {browser_id}: {e}")
+                            logger.error(f"[Pool] Error during cleanup for browser {browser_id}: {e}")
+                    else:
+                         logger.warning(f"[Pool] Browser {browser_id} not found during final cleanup loop, already removed?)")
                 
-                # Clear browser tracking
+                # Clear browser tracking dictionary
                 self.browsers.clear()
-                self.last_used.clear()
-                
-                # Stop monitoring if active
-                if self._monitor_task_handle and not self._monitor_task_handle.done():
-                    self._monitor_task_handle.cancel()
-                    try:
-                        await asyncio.wait_for(self._monitor_task_handle, timeout=5.0)
-                    except (asyncio.TimeoutError, asyncio.CancelledError):
-                        pass
-                    except Exception as e:
-                        logger.error(f"[Pool] Error cancelling monitor task: {e}")
                 
                 logger.info("[Pool] Cleanup completed")
                 
@@ -571,11 +644,13 @@ class BrowserPool:
             logger.error(f"[Pool] Unexpected error during cleanup: {e}", exc_info=True)
         finally:
             # Ensure we don't try to use the event loop after it's closed
+            # And release lock if held
             try:
                 if self.lock.locked():
                     self.lock.release()
-            except Exception:
-                pass
+                    logger.debug("[Pool] Released lock in cleanup finally block.")
+            except Exception as lock_e:
+                 logger.warning(f"[Pool] Exception releasing lock in cleanup: {lock_e}")
 
 # Global instance
 browser_pool = None

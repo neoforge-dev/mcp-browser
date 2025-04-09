@@ -34,7 +34,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 python_classes = ["Test*"]
-addopts = "-v --tb=short --strict-markers --disable-warnings"
+addopts = "-v --tb=short --strict-markers"
 markers = [
     "asyncio: mark test as async",
     "timeout: mark test with timeout",
@@ -44,6 +44,6 @@ filterwarnings = [
     "ignore::pytest.PytestDeprecationWarning",
     "ignore::pytest_asyncio.PytestDeprecationWarning",
 ]
-asyncio_default_fixture_loop_scope = "function"
-timeout = 60
+timeout = 30
 timeout_method = "thread"
+asyncio_default_fixture_loop_scope = "session"

@@ -2,14 +2,16 @@
 
 ## Current Focus Areas
 
-1.  **Resource Mgmt**: Implement context/pool management & cleanup.
-2.  **Security**: Implement rate limiting, granular AppArmor, network isolation.
-3.  **Verification Agent**: Integrate static analysis, test automation, security checks.
-4.  **Monitoring**: Integrate NetData, Loki+Grafana, cAdvisor.
-5.  **DevEx**: API Docs (w/ examples), CLI tool, example scripts.
+1.  **Resource Mgmt Robustness**: Ensure pool/context cleanup is bulletproof.
+2.  **Test Coverage**: Improve integration and error scenario testing.
+3.  **Security**: Rate limiting, network isolation improvements.
+4.  **Verification Agent**: Static analysis, security checks.
+5.  **Monitoring**: Setup and integration.
+6.  **DevEx**: API Docs, CLI tool.
 
 ## Recent Changes
 
+*   **Phase 1 Stabilization Complete**: Resolved test hangs by refactoring fixtures (`conftest.py`, `test_resource_management.py`), improving `BrowserPool` cleanup logic, and refining timeouts (`pyproject.toml`).
 *   Core frontend analysis APIs completed.
 *   MCP protocol extensions implemented.
 *   WebSocket event subscriptions functional (with filtering).
@@ -18,15 +20,16 @@
 
 ## Technical Debt / Must-Have Tasks (Summary)
 
-*   **Resource Mgmt**: Context mgmt, cleanup, event perf.
-*   **Security**: Rate limiting, AppArmor, network isolation.
+*   **Resource Mgmt**: Perf optimization (high-volume events).
+*   **Test Coverage**: Integration, error cases, network routing.
+*   **Security**: Rate limiting, granular AppArmor, network isolation hardening.
 *   **Verification**: Static analysis, test automation, security checks.
 *   **Monitoring**: NetData, Loki+Grafana, cAdvisor integration.
 *   **DevEx**: API docs, CLI tool, examples.
 
 ## Active Decisions / Strategy
 
-*   **Resource Mgmt**: Use context pooling; optimize event broadcasting.
+*   **Resource Mgmt**: Continue with context pooling; optimize event broadcasting.
 *   **Security**: Use FastAPI middleware for rate limits; Docker network isolation.
 *   **Verification**: Use pytest; integrate tools like SonarQube.
 *   **Monitoring**: Use NetData (system), Loki+Grafana (logs), cAdvisor (containers).
@@ -34,39 +37,39 @@
 
 ## Open Questions / Blockers
 
-*   Optimal context management strategy (pooling/cleanup)?
+*   Optimal event broadcast optimization strategy?
 *   Efficient rate limiting details (limits, burst handling)?
 *   Best static analysis/security tools to integrate?
 *   Monitoring setup details (key metrics, alerting)?
-*   *Blocker*: Need to implement Resource Mgmt (context/pooling) for stability.
-*   *Blocker*: Need to implement Security (rate limiting, network isolation).
-*   *Blocker*: Need to select and integrate Verification/Monitoring tools.
 
-## Current Sprint Goals
+## Current Sprint Goals (Refined for Phase 2)
 
-1.  Implement browser context management.
-2.  Add rate limiting & security enhancements.
-3.  Integrate verification tools.
-4.  Set up monitoring infrastructure.
-5.  Enhance DevEx (docs, tools).
+1.  Enhance resource management cleanup robustness.
+2.  Add test coverage for network isolation and error handling.
+3.  Implement basic API rate limiting.
+4.  Select and integrate a static analysis tool.
+5.  Set up basic system monitoring (NetData).
 
 ## Current Work Focus
-- Stabilizing the `pytest` test suite to resolve hanging issues during cleanup.
-- Refactoring inconsistent test fixture usage.
+- **Phase 2: Enhancing Robustness**
+  - Evaluate test isolation needs (function-scoped vs. session-scoped fixture).
+  - Add test coverage for network routing, error handling, and resource monitoring scenarios.
+  - Improve cleanup logic further if edge cases are found.
 
-## Identified Problems
-- **Test Hang:** The test suite currently hangs during the session teardown phase, specifically within the `browser_pool` fixture's `cleanup` method, after `tests/test_resource_management.py::test_browser_pool_limits` fails.
-- **Fixture Misuse:** `test_browser_pool_limits` incorrectly creates its own `BrowserPool` instead of using the shared session-scoped fixture from `conftest.py`, leading to inconsistent testing and likely contributing to cleanup issues.
-- **Cleanup Robustness:** The current cleanup logic in `BrowserPool` and `BrowserInstance` may not be resilient enough to handle resources left in an inconsistent state by failed tests.
-- **Technical Debt:** Excessive debug logging and temporary timeouts were added, needing removal/refinement.
+## Identified Problems (Previously Resolved)
+- Test Hang: Resolved.
+- Fixture Misuse: Resolved.
+- Cleanup Robustness: Improved, ongoing refinement in Phase 2.
+- Technical Debt: Logging/timeouts refined.
 
-## Next Steps (Phase 1: Stabilization)
-1.  **Refactor `test_browser_pool_limits`:** Modify the test to use the shared session-scoped `browser_pool` fixture and validate its `max_browsers` limit. Rename for clarity (e.g., `test_shared_pool_max_browser_limit`).
-2.  **Enhance Fixture Cleanup:** Improve error handling within `BrowserPool.cleanup`, `BrowserPool.close_browser`, and `BrowserInstance.close` to gracefully handle potentially faulty browser/context states.
-3.  **Refine Logging & Timeouts:** Reduce log verbosity (use DEBUG level) and remove temporary `asyncio.wait_for` timeouts.
-4.  **Verify:** Confirm the hang is resolved and tests run to completion.
+## Next Steps (Phase 2: Enhancing Robustness)
+1.  **Evaluate Test Isolation:** Assess if the current session-scoped fixture is sufficient or if function-scoped fixtures are needed for certain tests to prevent state leakage.
+2.  **Add Network Routing Tests:** Create tests specifically for validating `allowed_domains` and `blocked_domains` functionality.
+3.  **Add Error Handling Tests:** Test how the system behaves under various error conditions (e.g., Playwright errors, pool errors).
+4.  **Refine Resource Monitoring Tests:** Expand tests for resource limit enforcement (CPU, detailed memory).
+5.  **Update `system-patterns.md`**: Document fixture strategy and cleanup patterns.
 
-## Future Steps (Phase 2 & 3)
-- Evaluate test isolation needs (function-scoped fixture vs. improved session fixture).
-- Add missing test coverage for network routing, error handling, and resource monitoring.
-- Update Memory Bank (`system-patterns.md`, `progress.md`) upon completion of Phase 1. 
+## Future Steps (Phase 3 and Beyond)
+- Implement high-priority features (Security, Verification, Monitoring, DevEx).
+- Optimize performance for high-volume event handling.
+- Expand integration and performance testing. 
