@@ -11,7 +11,7 @@ if [ -f /tmp/.X99-lock ]; then
 fi
 
 # Start Xvfb
-Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset &
+Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 &
 XVFB_PID=$!
 
 # Give Xvfb time to start
@@ -29,10 +29,16 @@ echo "Xvfb started with PID $XVFB_PID"
 # Set up a trap to ensure clean shutdown
 trap "echo 'Shutting down Xvfb and MCP Browser'; kill $XVFB_PID; exit" SIGINT SIGTERM
 
-# Start the MCP browser application
-echo "Starting MCP Browser application..."
-cd /app
-python3 src/main.py
+# Determine if we're in test mode
+if [ "$RUN_TESTS" = "true" ]; then
+    echo "Running tests..."
+    cd /app
+    pytest /app/tests -v -vv --capture=no
+else
+    echo "Starting MCP Browser application..."
+    cd /app
+    python3 src/main.py
+fi
 
-# If the application exits, also kill Xvfb
+# Clean up Xvfb
 kill $XVFB_PID 

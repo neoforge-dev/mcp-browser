@@ -1,115 +1,72 @@
-# Active Context - MCP Browser Project
+# Active Context - MCP Browser (v0.4.0)
 
-## Current Focus
+## Current Focus Areas
 
-The project is at version 0.4.0 with core features implemented. Our current focus is on:
+1.  **Resource Mgmt**: Implement context/pool management & cleanup.
+2.  **Security**: Implement rate limiting, granular AppArmor, network isolation.
+3.  **Verification Agent**: Integrate static analysis, test automation, security checks.
+4.  **Monitoring**: Integrate NetData, Loki+Grafana, cAdvisor.
+5.  **DevEx**: API Docs (w/ examples), CLI tool, example scripts.
 
-1. **Resource Management**: Implementing browser context management and resource pooling for better performance and stability.
-2. **Security Enhancements**: Implementing rate limiting, granular AppArmor profiles, and network isolation.
-3. **Verification Agent**: Integrating static analysis tools, unit test automation, and security checks.
-4. **Monitoring Integration**: Setting up NetData, Loki+Grafana, and cAdvisor for comprehensive monitoring.
-5. **Developer Experience**: Creating comprehensive API documentation, CLI tools, and example scripts.
+## Recent Changes
 
-## Latest Changes
+*   Core frontend analysis APIs completed.
+*   MCP protocol extensions implemented.
+*   WebSocket event subscriptions functional (with filtering).
+*   Basic security (AppArmor, non-root) in place.
+*   Core documentation structure established.
 
-- Successfully implemented all core frontend analysis APIs
-- Completed MCP protocol extensions implementation
-- Implemented WebSocket event subscriptions with filtering
-- Fixed XQuartz integration issues
-- Added basic security measures with AppArmor profiles
-- Established core documentation structure
+## Technical Debt / Must-Have Tasks (Summary)
 
-## Development Summary (April 7, 2024)
+*   **Resource Mgmt**: Context mgmt, cleanup, event perf.
+*   **Security**: Rate limiting, AppArmor, network isolation.
+*   **Verification**: Static analysis, test automation, security checks.
+*   **Monitoring**: NetData, Loki+Grafana, cAdvisor integration.
+*   **DevEx**: API docs, CLI tool, examples.
 
-Current technical debt and must-have tasks identified:
+## Active Decisions / Strategy
 
-1. **Resource Management**:
-   - Implement browser context management for multi-session support
-   - Add robust resource cleanup after API calls
-   - Optimize performance for high-volume event broadcasting
+*   **Resource Mgmt**: Use context pooling; optimize event broadcasting.
+*   **Security**: Use FastAPI middleware for rate limits; Docker network isolation.
+*   **Verification**: Use pytest; integrate tools like SonarQube.
+*   **Monitoring**: Use NetData (system), Loki+Grafana (logs), cAdvisor (containers).
+*   **DevEx**: Use FastAPI docs; Click/Typer for CLI.
 
-2. **Security Enhancements**:
-   - Implement rate limiting for API endpoints
-   - Create more granular AppArmor profiles
-   - Improve network isolation
+## Open Questions / Blockers
 
-3. **Verification Agent Features**:
-   - Integrate static analysis tools
-   - Implement unit test automation
-   - Add security checks
-
-4. **Monitoring Tools**:
-   - Integrate NetData for system metrics
-   - Set up Loki+Grafana for logging
-   - Add cAdvisor for container monitoring
-
-5. **Developer Experience**:
-   - Create comprehensive API documentation with examples
-   - Develop CLI tool for easier interaction
-   - Add more example scripts and tutorials
-
-## Active Decisions
-
-1. **Resource Management Strategy**:
-   - Implement browser context management for proper page handling
-   - Add resource pooling to prevent memory leaks
-   - Optimize event broadcasting for high load
-
-2. **Security Implementation**:
-   - Implement rate limiting using FastAPI middleware
-   - Create granular AppArmor profiles for different operations
-   - Use Docker network isolation features
-
-3. **Verification Agent Architecture**:
-   - Use existing static analysis tools (e.g., SonarQube)
-   - Implement pytest for unit test automation
-   - Add security scanning tools
-
-4. **Monitoring Strategy**:
-   - Use NetData for real-time system metrics
-   - Implement Loki+Grafana for log aggregation
-   - Use cAdvisor for container metrics
-
-5. **Developer Experience**:
-   - Use FastAPI's built-in documentation features
-   - Create CLI tool using Click or Typer
-   - Provide comprehensive examples
-
-## Open Questions
-
-1. **What's the optimal approach for browser context management?**
-   - Should we use a pool of browser contexts?
-   - How to handle context cleanup?
-
-2. **How to implement efficient rate limiting?**
-   - What should be the rate limits?
-   - How to handle burst traffic?
-
-3. **What static analysis tools to integrate?**
-   - Which tools provide the most value?
-   - How to handle false positives?
-
-4. **How to structure the monitoring setup?**
-   - What metrics are most important?
-   - How to handle alerting?
-
-## Current Blockers
-
-1. **Resource Management**: Need to implement proper browser context management to prevent memory leaks and improve performance.
-
-2. **Security Implementation**: Need to implement rate limiting and improve network isolation.
-
-3. **Verification Tools**: Need to select and integrate appropriate static analysis and security tools.
-
-4. **Monitoring Setup**: Need to configure and integrate monitoring tools.
+*   Optimal context management strategy (pooling/cleanup)?
+*   Efficient rate limiting details (limits, burst handling)?
+*   Best static analysis/security tools to integrate?
+*   Monitoring setup details (key metrics, alerting)?
+*   *Blocker*: Need to implement Resource Mgmt (context/pooling) for stability.
+*   *Blocker*: Need to implement Security (rate limiting, network isolation).
+*   *Blocker*: Need to select and integrate Verification/Monitoring tools.
 
 ## Current Sprint Goals
 
-1. ~~Complete core API implementation~~ ✅ COMPLETED
-2. ~~Implement MCP protocol extensions~~ ✅ COMPLETED
-3. ~~Implement WebSocket event subscriptions~~ ✅ COMPLETED
-4. Implement browser context management
-5. Add rate limiting and security enhancements
-6. Integrate verification tools
-7. Set up monitoring infrastructure
-8. Enhance developer documentation and tools 
+1.  Implement browser context management.
+2.  Add rate limiting & security enhancements.
+3.  Integrate verification tools.
+4.  Set up monitoring infrastructure.
+5.  Enhance DevEx (docs, tools).
+
+## Current Work Focus
+- Stabilizing the `pytest` test suite to resolve hanging issues during cleanup.
+- Refactoring inconsistent test fixture usage.
+
+## Identified Problems
+- **Test Hang:** The test suite currently hangs during the session teardown phase, specifically within the `browser_pool` fixture's `cleanup` method, after `tests/test_resource_management.py::test_browser_pool_limits` fails.
+- **Fixture Misuse:** `test_browser_pool_limits` incorrectly creates its own `BrowserPool` instead of using the shared session-scoped fixture from `conftest.py`, leading to inconsistent testing and likely contributing to cleanup issues.
+- **Cleanup Robustness:** The current cleanup logic in `BrowserPool` and `BrowserInstance` may not be resilient enough to handle resources left in an inconsistent state by failed tests.
+- **Technical Debt:** Excessive debug logging and temporary timeouts were added, needing removal/refinement.
+
+## Next Steps (Phase 1: Stabilization)
+1.  **Refactor `test_browser_pool_limits`:** Modify the test to use the shared session-scoped `browser_pool` fixture and validate its `max_browsers` limit. Rename for clarity (e.g., `test_shared_pool_max_browser_limit`).
+2.  **Enhance Fixture Cleanup:** Improve error handling within `BrowserPool.cleanup`, `BrowserPool.close_browser`, and `BrowserInstance.close` to gracefully handle potentially faulty browser/context states.
+3.  **Refine Logging & Timeouts:** Reduce log verbosity (use DEBUG level) and remove temporary `asyncio.wait_for` timeouts.
+4.  **Verify:** Confirm the hang is resolved and tests run to completion.
+
+## Future Steps (Phase 2 & 3)
+- Evaluate test isolation needs (function-scoped fixture vs. improved session fixture).
+- Add missing test coverage for network routing, error handling, and resource monitoring.
+- Update Memory Bank (`system-patterns.md`, `progress.md`) upon completion of Phase 1. 

@@ -1,0 +1,37 @@
+version: "3.8"
+
+networks:
+  mcp-browser-internal:
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "com.mcp-browser.network=internal"
+      - "com.mcp-browser.security=high"
+
+  mcp-browser-external:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+    labels:
+      - "com.mcp-browser.network=external"
+      - "com.mcp-browser.security=medium"
+
+  mcp-browser-monitoring:
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+    labels:
+      - "com.mcp-browser.network=monitoring"
+      - "com.mcp-browser.security=high"

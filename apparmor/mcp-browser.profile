@@ -14,26 +14,37 @@ profile mcp-browser flags=(attach_disconnected) {
     capability sys_chroot,
     capability sys_admin,
 
-    # Allow network access
+    # Network access controls
     network inet stream,
     network inet6 stream,
     network unix stream,
-
-    # Allow process operations
+    
+    # Deny raw socket access
+    deny network raw,
+    
+    # Allow specific ports
+    network inet tcp port 8000,
+    network inet tcp port 7665,
+    
+    # Deny ICMP
+    deny network inet icmp,
+    deny network inet6 icmp,
+    
+    # Process operations
     ptrace (read) peer=@{profile_name},
     signal (receive) peer=@{profile_name},
 
-    # Allow file operations
+    # File operations
     /usr/bin/python3* ix,
     /usr/local/bin/python3* ix,
     /usr/lib/python3/** r,
     /usr/local/lib/python3/** r,
     
-    # Allow rate limiting storage
+    # Rate limiting storage
     owner /tmp/mcp-browser-rate-limit/ rw,
     owner /tmp/mcp-browser-rate-limit/** rwk,
     
-    # Allow browser operations
+    # Browser operations
     owner @{PROC}/@{pid}/fd/ r,
     owner @{PROC}/@{pid}/task/@{pid}/stat r,
     owner @{PROC}/@{pid}/stat r,
@@ -42,43 +53,58 @@ profile mcp-browser flags=(attach_disconnected) {
     owner @{PROC}/@{pid}/mem r,
     owner @{PROC}/@{pid}/auxv r,
     
-    # Allow system metrics for rate limiting
+    # System metrics
     @{PROC}/loadavg r,
     @{PROC}/stat r,
     @{PROC}/meminfo r,
     @{PROC}/cpuinfo r,
     
-    # Allow browser process monitoring
+    # Browser process monitoring
     @{PROC}/*/{stat,status,cmdline} r,
     
-    # Allow X11 display
+    # X11 display
     /tmp/.X11-unix/* rw,
     
-    # Allow SSL certificates
+    # SSL certificates
     /etc/ssl/certs/** r,
     /usr/share/ca-certificates/** r,
     
-    # Allow application paths
+    # Application paths
     /app/** r,
     /app/src/** r,
     /app/static/** r,
     owner /app/output/** rw,
     
-    # Allow temporary files
+    # Temporary files
     owner /tmp/** rwk,
     
-    # Allow log files
+    # Log files
     owner /var/log/mcp-browser/ rw,
     owner /var/log/mcp-browser/** rw,
     
-    # Allow shared memory
+    # Shared memory
     owner /{,var/}run/shm/** rwk,
     
-    # Allow browser sandbox
+    # Browser sandbox
     owner /dev/shm/** rwk,
     
+    # Security denials
     deny @{PROC}/sys/kernel/yama/ptrace_scope w,
     deny @{PROC}/sys/kernel/suid_dumpable w,
     deny @{PROC}/sysrq-trigger w,
     deny @{PROC}/kcore r,
+    
+    # Network security
+    deny network inet raw,
+    deny network inet6 raw,
+    deny network packet,
+    deny network netlink,
+    
+    # Additional security
+    deny @{PROC}/sys/net/ipv4/conf/*/accept_redirects w,
+    deny @{PROC}/sys/net/ipv4/conf/*/send_redirects w,
+    deny @{PROC}/sys/net/ipv4/ip_forward w,
+    deny @{PROC}/sys/net/ipv6/conf/*/accept_redirects w,
+    deny @{PROC}/sys/net/ipv6/conf/*/send_redirects w,
+    deny @{PROC}/sys/net/ipv6/ip_forward w,
 } 

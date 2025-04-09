@@ -1,11 +1,22 @@
+.PHONY: build test test-network clean run
+
 build:
 	docker-compose build
 
-run:
-	docker-compose up -d
+run: build
+	RUN_TESTS=false docker-compose up -d
 
-test:
-	docker-compose exec mcp-browser pytest tests/ -v
+test: build
+	RUN_TESTS=true docker-compose up -d
+	docker-compose logs -f
+
+test-network: build
+	RUN_TESTS=true docker-compose up -d
+	docker-compose exec mcp-browser pytest /app/tests/test_network_isolation.py -v
+
+clean:
+	docker-compose down
+	docker-compose rm -f
 
 publish:
 	docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}

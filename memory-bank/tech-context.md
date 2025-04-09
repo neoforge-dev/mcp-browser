@@ -1,25 +1,76 @@
-# Technical Context for MCP Browser
+# Technical Context - MCP Browser
 
-## Core Technologies
+## Core Stack
 
-### Programming Languages & Frameworks
-- **Python 3.13+**: Primary development language
-- **FastAPI**: Modern, high-performance web framework for APIs
-- **Playwright**: Browser automation framework from Microsoft
-- **Docker**: Containerization technology for consistent environments
-- **WebSockets**: For real-time communication between agents and browser
+*   **Language/Framework**: Python 3.13+, FastAPI
+*   **Browser Automation**: Playwright (>=1.51.0) with Chromium
+*   **Infrastructure**: Docker (+Compose), Xvfb, AppArmor
+*   **Comms**: WebSockets (>=15.0.1), HTTPS (via Uvicorn)
+*   **Package Manager**: uv
 
-### Infrastructure
-- **Docker Compose**: For local development and simple deployments
-- **Xvfb**: Virtual framebuffer for headless browser rendering
-- **AppArmor**: Linux security module for application isolation
-- **uv**: Fast Python package manager and installer
+## Key Dependencies
 
-### Browser Technologies
-- **Chromium**: Primary browser engine
-- **WebKit/Firefox**: Secondary browser engines (optional support)
-- **X11**: X Window System for display server
-- **HTTPS/SSL**: For secure communication
+*   **Core**: `fastapi` (>=0.108.0), `playwright` (>=1.51.0), `uvicorn[standard]` (>=0.24.0), `websockets` (>=15.0.1), `psutil`, `pydantic` (>=2.0.0), `docker`
+*   **Security**: `python-jose` (>=3.4.0) (JWT), `passlib[bcrypt]` (>=1.7.4)
+*   **Utils**: `aiohttp` (>=3.11.14), `pyyaml` (>=6.0), `httpx` (>=0.28.1), `aiofiles` (>=24.1.0)
+*   **Testing**: `pytest` (>=8.2.0), `pytest-asyncio` (==0.25.3), `pytest-cov` (==4.1.0), `pytest-timeout`
+
+## Dev Environment Setup
+
+*   **Prereqs**: Python 3.13+, Docker, uv, Git
+*   **Structure**: `src/`, `tests/`, `docker/`, `Dockerfile`, `docker-compose.yml`, `pyproject.toml` (`requirements-test.txt` for test deps)
+*   **Init**:
+    ```bash
+    git clone <repo_url>
+    cd mcp-browser
+    uv venv .venv
+    source .venv/bin/activate
+    uv pip install -e . # Installs project dependencies from pyproject.toml
+    uv pip install -r requirements-test.txt # Installs test dependencies
+    python -m playwright install chromium # Install browser if needed
+    # For Docker-based dev:
+    # docker-compose up -d
+    ```
+*   **Testing**: `pytest tests/` or via `make` targets
+
+## Technical Constraints
+
+*   **Python Version**: >= 3.13 required due to dependencies/features.
+*   **Target Hardware**: Resource efficiency is critical (target < 300MB RAM/instance).
+*   **Security**: Non-root execution, AppArmor enforcement, resource limits mandatory.
+*   **Network**: SSH tunnel required for remote access in some deployment models.
+*   **Browser**: Primarily targets Chromium via Playwright.
+
+## Monitoring Stack (Planned)
+
+*   **System**: NetData
+*   **Logs**: Loki + Grafana
+*   **Containers**: cAdvisor
+
+## Deployment
+
+*   **Primary**: Docker Compose (`docker-compose.yml`) for local/production.
+*   **Environment**: Configured via `.env` file (see `.env.example`).
+
+## Security Layers
+
+*   **Network**: SSH Tunnel (optional), Firewall rules, Rate Limiting (FastAPI middleware).
+*   **Application**: JWT Auth (planned), Input validation (Pydantic).
+*   **Container**: AppArmor profiles (`docker/apparmor/`), Non-root user, Docker resource quotas.
+*   **Browser**: Isolated contexts, Xvfb sandbox, Network restrictions (via `BrowserPool` config).
+
+## API Design Principles
+
+*   **Request**: Pydantic models for validation, required `url`.
+*   **Response**: Consistent JSON structure (status, metadata, result/file ref).
+*   **Error**: Standard HTTP codes, detailed JSON body, server-side logging.
+*   **Docs**: Auto-generated via FastAPI (OpenAPI).
+
+## Testing Strategy
+
+*   **Framework**: Pytest
+*   **Types**: Unit, Integration (mocking), E2E (real sites).
+*   **Tools**: `pytest-asyncio`, `pytest-cov`, `pytest-timeout`.
 
 ## Development Environment
 
@@ -49,53 +100,6 @@ mcp-browser/
 ├── run.sh                  # Deployment script
 └── simple_test.sh          # Local testing script
 ```
-
-## Technical Constraints
-
-1. **Hardware Requirements**:
-   - Designed to run on modest hardware (older Mac/Linux PCs)
-   - Memory optimization for headless operation (90% less RAM than full browsers)
-
-2. **Security Constraints**:
-   - Non-root execution is mandatory
-   - AppArmor profiles must be configured properly
-   - Resource limits enforced at container level
-
-3. **Network Constraints**:
-   - SSH tunneling for remote access
-   - Secure WebSocket communication
-   - Port controls and exposure management
-
-## Key Dependencies
-
-- **mcp**: Model Control Protocol for agent communication
-- **fastapi**: Web framework for API endpoints
-- **playwright**: Browser automation library
-- **uvicorn**: ASGI server for FastAPI
-- **pyyaml**: YAML parsing for configuration
-- **python-jose**: JWT support for authentication
-- **passlib**: Password hashing for security
-- **bcrypt**: Secure password hashing algorithm
-- **requests**: HTTP client library
-
-## Monitoring Tools
-
-- **NetData**: Real-time metrics collection
-- **Loki + Grafana**: Log aggregation and visualization
-- **cAdvisor**: Container resource monitoring
-
-## Deployment Strategy
-
-1. **Local Development**: Docker Compose with volume mounts
-2. **Production**: Docker containers with resource constraints
-3. **Scaling Strategy**: Horizontal scaling with container orchestration
-
-## Security Architecture
-
-1. **Web Security**: HTTPS, Rate limiting
-2. **Container Security**: AppArmor, Non-root user, Resource limits
-3. **Authentication**: JWT tokens, Environment-based secrets
-4. **Browser Isolation**: Xvfb sandboxing, Container isolation 
 
 ## Technologies Used
 

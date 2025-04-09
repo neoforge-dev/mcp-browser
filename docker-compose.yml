@@ -1,27 +1,67 @@
+version: "3.8"
+
 services:
   mcp-browser:
-    build: .
-    image: neoforge-dev/mcp-browser:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-browser
     environment:
-      - MCP_SECRET=${MCP_SECRET}
-      - SERVER_PORT=8000
+      - PYTHONPATH=/app
       - DISPLAY=:99
-    security_opt:
-      - apparmor=mcp-browser
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 2G
-    ports:
-      - "7665:8000"
+      - NETWORK_ISOLATION=true
+      - ALLOWED_DOMAINS=example.com
+      - BLOCKED_DOMAINS=blocked.com
+      - RUN_TESTS=${RUN_TESTS:-false}
     volumes:
       - ./src:/app/src
-      - /tmp/.X11-unix:/tmp/.X11-unix
-    restart: unless-stopped
+      - ./tests:/app/tests
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mcp-browser-internal
+      - mcp-browser-external
+      - mcp-browser-monitoring
+    security_opt:
+      - apparmor=mcp-browser
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    sysctls:
+      net.ipv4.tcp_syncookies: 1
+      net.ipv4.tcp_max_syn_backlog: 1024
+      net.ipv4.tcp_synack_retries: 2
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "7665:7665"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:7665/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+networks:
+  mcp-browser-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+  mcp-browser-external:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+  mcp-browser-monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1

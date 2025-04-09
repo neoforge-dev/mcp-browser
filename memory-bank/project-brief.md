@@ -1,65 +1,44 @@
-# MCP Browser - Project Brief
+# Project Brief - MCP Browser
 
 ## Overview
-MCP Browser is an enterprise-grade browser automation solution designed to work as a smart browser for L3 coding agents. It enables AI agents to test frontend applications in real browser environments, evaluate outputs, and identify frontend-related issues.
 
-## Core Requirements
+*   **Purpose**: Enterprise-grade secure browser automation for L3 AI coding agents.
+*   **Function**: Enables AI agents to test frontends, evaluate rendering, and identify issues in real browsers.
 
-1. **Browser Automation Platform**
-   - Headless browser execution with Playwright
-   - Real browser rendering metrics and analysis
-   - Virtual display server (Xvfb) for headless operation
+## Core Requirements (Summarized)
 
-2. **Security by Default**
-   - AppArmor profiles for container security
-   - Non-root execution of browser processes
-   - Environment-based credential management
-   - Resource limiting to prevent exhaustion
-   - Isolated display server with Xvfb
+1.  **Platform**: Headless browser (Playwright/Chromium) via Xvfb.
+2.  **Security**: AppArmor, non-root, resource limits, env secrets, isolated display.
+3.  **Deployment**: One-command deploy (Docker), resource pooling.
+4.  **Verification**: Static analysis, automated tests (CI), security checks.
+5.  **Agent Integration**: MCP via WebSockets/API, screenshot/DOM analysis.
 
-3. **Deployment & Operations**
-   - One-command deployment (similar to Nomad)
-   - Docker containerization for consistent environments
-   - Resource pooling and cost controls
-   - Monitoring and metrics collection
+## Architecture Sketch
 
-4. **Verification & Testing**
-   - Static code analysis (Bandit/Semgrep)
-   - Automated testing pipeline
-   - Security validation checks
-   - Frontend rendering verification
-
-5. **Agent Integration**
-   - MCP (Model Control Protocol) interface for AI agents
-   - Websocket communication for real-time updates
-   - API for programmatic browser control
-   - Screenshot and DOM analysis capabilities
-
-## Technical Architecture
-
-```
+```mermaid
 graph TD
-    A[Claude Desktop] --> B[SSH Tunnel]
-    B --> C[Older Mac/Linux PC]
-    C --> D[Playwright in Docker]
-    D --> E[Headless Chromium]
-    D --> F[Resource Monitor]
-    C --> G[MCP Server]
-    G --> H[Security Sandbox]
+    A[AI Agent] -->|MCP/SSH| B(MCP Browser Service);
+    subgraph Docker Host [Older Mac/Linux PC]
+      direction LR
+      B --> C{Playwright};
+      C --> D[Headless Chromium];
+      D --> E(Xvfb);
+      B --> F(Security Sandbox/AppArmor);
+      B --> G(Resource Monitor);
+    end
 ```
 
 ## Success Criteria
 
-1. Deploy browser automation with a single command
-2. Run browser tests in isolated, secure containers
-3. Provide accurate rendering analysis
-4. Operate efficiently on modest hardware (90% less RAM than full browsers)
-5. Maintain comprehensive security controls
-6. Enable AI agents to effectively identify frontend issues
+*   One-command deployment.
+*   Secure container isolation.
+*   Accurate rendering analysis.
+*   Resource efficient (target < 300MB RAM/instance).
+*   AI agents can effectively identify frontend issues.
 
 ## Out of Scope
 
-1. Full browser UI for human interaction
-2. Plugin or extension management
-3. Multi-user session management
-4. Complex browser fingerprinting or anti-detection features 
+*   Interactive UI for humans.
+*   Browser extension management.
+*   Multi-user session management.
+*   Advanced anti-detection features. 

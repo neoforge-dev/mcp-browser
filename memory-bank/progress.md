@@ -1,133 +1,65 @@
-# Progress - MCP Browser Project
+# Progress - MCP Browser (v0.4.0)
 
-## What Works
+## Completed Features
 
-- **Core Frontend Analysis APIs**:
-  - Screenshot Capture API (`/api/screenshots/capture`)
-  - DOM Extraction API (`/api/dom/extract`)
-  - CSS Analysis API (`/api/css/analyze`)
-  - Accessibility Testing API (`/api/accessibility/test`)
-  - Responsive Design Testing API (`/api/responsive/test`)
+*   **Core APIs**: Screenshot, DOM Extract, CSS Analyze, Accessibility Test, Responsive Test.
+*   **MCP Extensions**: Browser Navigation, DOM Manipulation, Visual Analysis tools integrated.
+*   **WebSocket Events**: Real-time PAGE, DOM, CONSOLE, NETWORK events with filtering.
+*   **Basic Security**: AppArmor, Non-root execution, Basic API auth.
+*   **Infrastructure**: Docker, Xvfb, Playwright, FastAPI, Basic scripts.
 
-- **MCP Protocol Extensions**:
-  - Browser Navigation Tools (navigate, back, forward, refresh, get URL, get title)
-  - DOM Manipulation Tools (click, type, select, fill form, check visibility, wait for selector, evaluate Javascript)
-  - Visual Analysis Tools (screenshot, extract text, evaluate Javascript)
-
-- **WebSocket Event Subscriptions**:
-  - Real-time event streaming for PAGE, DOM, CONSOLE, and NETWORK events
-  - Subscription management (subscribe, unsubscribe, list)
-  - Event filtering by URL pattern and page ID
-
-- **Basic Security**:
-  - AppArmor profiles for Docker containers
-  - Non-root container execution
-  - Basic API authentication
-
-- **Infrastructure**:
-  - Docker containerization
-  - Xvfb virtual display
-  - Playwright automation engine
-  - FastAPI server
-  - Environment configuration
-  - Basic build and run scripts
-
-## What's Left to Build
+## Pending Tasks (Prioritized)
 
 ### High Priority (Must Have)
 
-1. **Resource Management**:
-   - Browser context management for multi-session support
-   - Resource cleanup after API calls
-   - Performance optimization for high-volume events
-
-2. **Security Enhancements**:
-   - Rate limiting for API endpoints
-   - Granular AppArmor profiles
-   - Network isolation improvements
-
-3. **Verification Agent**:
-   - Static analysis integration
-   - Unit test automation
-   - Security checks implementation
-
-4. **Monitoring Tools**:
-   - NetData integration
-   - Loki + Grafana setup
-   - cAdvisor integration
-
-5. **Developer Experience**:
-   - Comprehensive API documentation with examples
-   - CLI tool for easier interaction
-   - Example scripts and tutorials
+1.  **Resource Mgmt**: Browser context/pool mgmt, Resource cleanup, Perf optimization (high-volume events).
+2.  **Security**: Rate limiting, Granular AppArmor, Network isolation improvements.
+3.  **Verification Agent**: Static analysis integration, Test automation, Security checks.
+4.  **Monitoring**: NetData, Loki+Grafana, cAdvisor integration.
+5.  **DevEx**: API docs (w/ examples), CLI tool, Example scripts.
 
 ### Medium Priority
 
-1. **Network Features**:
-   - Network interception and modification
-   - Cookie and storage management
-   - Performance metrics collection
+1.  **Network Features**: Interception/modification, Cookie/storage mgmt, Perf metrics.
+2.  **Testing**: Comprehensive coverage (Integration, Performance).
+3.  **Error Handling**: Standardized responses, Better reporting, Graceful degradation.
 
-2. **Testing Framework**:
-   - Comprehensive test coverage
-   - Integration tests
-   - Performance tests
+## Current Status Summary
 
-3. **Error Handling**:
-   - Standardized error responses
-   - Better error reporting
-   - Graceful degradation
-
-## Current Status
-
-**Version:** 0.4.0
-
-The MCP Browser has successfully implemented all core features including frontend analysis APIs, MCP protocol extensions, and WebSocket event subscriptions. The project is now focusing on resource management, security enhancements, and developer experience improvements.
+Core features implemented. Focus now on resource management, security, verification, monitoring, and DevEx.
 
 ## Known Issues
+- **Test Suite Hang:** The `pytest` suite currently hangs during session teardown (fixture cleanup) after `test_browser_pool_limits` fails. This prevents test completion and requires manual interruption. (See `active-context.md` for resolution plan).
+- **Inconsistent Fixture Usage:** `test_browser_pool_limits` creates its own `BrowserPool` instead of using the shared session fixture, leading to inconsistent testing. (Part of the hang resolution plan).
+- **Potential Cleanup Fragility:** The robustness of browser/context cleanup in error scenarios needs improvement. (Part of the hang resolution plan).
 
-| Issue | Description | Severity | Status |
-|-------|-------------|----------|--------|
-| Browser Resource Management | Need proper cleanup of browser resources after API calls | High | In Progress |
-| Rate Limiting | Missing rate limiting for API endpoints | High | To Address |
-| Network Isolation | Need improved network isolation in Docker | High | To Address |
-| Static Analysis | Missing integration with static analysis tools | High | To Address |
-| Monitoring | No comprehensive monitoring setup | High | To Address |
-| Documentation | API documentation needs examples | Medium | To Address |
-| Error Handling | Need standardized error handling | Medium | To Address |
-| Performance | Event broadcasting needs optimization | Medium | To Address |
+## Next Steps
+- Execute Phase 1 of the test stabilization plan outlined in `active-context.md`.
+- Refactor `test_browser_pool_limits`.
+- Improve cleanup robustness in `BrowserPool` / `BrowserInstance`.
+- Refine logging and remove debug timeouts.
+- Verify test suite completion.
 
-## Next Development Priorities
+## Progress Checklist
 
-1. Implement browser context management
-2. Add rate limiting and security enhancements
-3. Integrate verification tools
-4. Set up monitoring infrastructure
-5. Enhance developer documentation and tools
-6. Add network interception capabilities
-7. Implement comprehensive error handling
-8. Create client library for easier integration
+*   [x] Project structure
+*   [x] Basic FastAPI server
+*   [x] Playwright integration
+*   [x] WebSocket interface
+*   [x] Core Frontend Analysis APIs
+*   [x] MCP Protocol Extensions
+*   [x] Basic Security (AppArmor, non-root)
+*   [ ] Resource Management (Context/Pooling/Cleanup)
+*   [ ] Security Enhancements (Rate Limit, Net Isolation)
+*   [ ] Verification Agent (Static Analysis, Tests)
+*   [ ] Monitoring Integration (NetData, Loki, etc.)
+*   [ ] Developer Experience (Docs, CLI, Examples)
 
-## Progress Status
+## Next Milestones (Target)
 
-- [x] Project structure set up
-- [x] Basic server functionality with FastAPI
-- [x] Playwright integration for browser control
-- [x] WebSocket interface for real-time communication
-- [x] Core frontend analysis APIs
-- [x] MCP protocol extensions
-- [x] Basic security measures
-- [ ] Resource management improvements
-- [ ] Enhanced security features
-- [ ] Verification agent implementation
-- [ ] Monitoring setup
-- [ ] Developer experience enhancements
-
-## Next Major Milestones
-
-- **April 2024**: Complete resource management improvements
-- **May 2024**: Implement security enhancements
-- **May 2024**: Integrate verification tools
-- **June 2024**: Set up monitoring infrastructure
-- **June 2024**: Enhance developer experience
-- **July 2024**: Production readiness with comprehensive testing 
+*   **April 2024**: Complete resource management.
+*   **May 2024**: Implement security enhancements.
+*   **May 2024**: Integrate verification tools.
+*   **June 2024**: Set up monitoring infrastructure.
+*   **June 2024**: Enhance developer experience.
+*   **July 2024**: Production readiness. 

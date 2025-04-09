@@ -1,37 +1,39 @@
 FROM mcr.microsoft.com/playwright:v1.51.1-noble
 
-# Security setup
-RUN apt-get update && \
-    apt-get install -y xvfb curl python3 python3-pip && \
-    mkdir -p /home/pwuser/Downloads && \
-    chown -R pwuser:pwuser /home/pwuser
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    curl \
+    python3 \
+    python3-pip \
+    python3.12-venv \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set up the application directory
+# Set up virtual environment
+ENV VIRTUAL_ENV=/app/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONPATH=/app
+RUN python3 -m venv $VIRTUAL_ENV
+
+# Install Python dependencies
+COPY pyproject.toml requirements-test.txt /app/
 WORKDIR /app
-
-# Copy pyproject.toml first for dependency installation
-COPY pyproject.toml .
-
-# Install dependencies using pip with system package override
-RUN python3 -m pip install --break-system-packages -e .
+RUN pip install --no-cache-dir -r requirements-test.txt
 
 # Install Playwright browsers
 RUN python3 -m playwright install chromium
 
-# Copy security configurations
-COPY docker/apparmor/mcp-browser.profile /etc/apparmor.d/
-RUN apparmor_parser -r /etc/apparmor.d/mcp-browser.profile || echo "AppArmor profile loading failed - skipping"
-
 # Copy application files
 COPY src/ /app/src/
+COPY tests/ /app/tests/
+
+# Copy Xvfb init script
 COPY docker/xvfb-init.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/xvfb-init.sh
 
-# Change ownership of the application to the non-root user
-RUN chown -R pwuser:pwuser /app
+# Set environment variables
+ENV DISPLAY=:99
+ENV RUN_TESTS=false
 
-# Switch to non-root user
-USER pwuser
-EXPOSE 7665
-
+# Start Xvfb and run application or tests
 CMD ["/usr/local/bin/xvfb-init.sh"]
