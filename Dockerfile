@@ -1,5 +1,8 @@
 FROM mcr.microsoft.com/playwright:v1.51.1-noble
 
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     xvfb \
@@ -7,6 +10,10 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3.12-venv \
+    iputils-ping \
+    netcat-openbsd \
+    apparmor-utils \
+    dbus \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up virtual environment

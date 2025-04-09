@@ -1,65 +1,49 @@
-# Progress - MCP Browser (v0.4.0)
+# Progress - MCP Browser (Optimized)
 
 ## Completed Features
+*   Core APIs (Screenshot, DOM, CSS, Access., Responsive)
+*   MCP Extensions (Nav, DOM Manip, Visual Analysis)
+*   WebSocket Events (Real-time PAGE, DOM, CONSOLE, NETWORK w/ filter)
+*   Basic Security (AppArmor, Non-root)
+*   Infrastructure (Docker, Xvfb, Playwright, FastAPI)
+*   Test Suite Stabilization (Phase 1: Hangs resolved, fixtures refactored, cleanup improved)
 
-*   **Core APIs**: Screenshot, DOM Extract, CSS Analyze, Accessibility Test, Responsive Test.
-*   **MCP Extensions**: Browser Navigation, DOM Manipulation, Visual Analysis tools integrated.
-*   **WebSocket Events**: Real-time PAGE, DOM, CONSOLE, NETWORK events with filtering.
-*   **Basic Security**: AppArmor, Non-root execution, Basic API auth.
-*   **Infrastructure**: Docker, Xvfb, Playwright, FastAPI, Basic scripts.
-*   **Test Suite Stabilization**: Resolved test hangs, refactored fixtures, improved cleanup robustness (Phase 1).
-
-## Pending Tasks (Prioritized)
-
-### High Priority (Must Have)
-
-1.  **Resource Mgmt**: Browser context/pool mgmt robustness, Perf optimization (high-volume events).
-2.  **Security**: Rate limiting, Granular AppArmor, Network isolation improvements.
-3.  **Verification Agent**: Static analysis integration, Test automation coverage, Security checks.
+## Pending Tasks (High Priority)
+1.  **Resource Mgmt**: Pool/Context cleanup robustness, Event perf optimization.
+2.  **Security**: Rate limiting, Granular AppArmor, Network isolation hardening.
+3.  **Verification**: Static analysis, Test coverage, Security checks.
 4.  **Monitoring**: NetData, Loki+Grafana, cAdvisor integration.
-5.  **DevEx**: API docs (w/ examples), CLI tool, Example scripts.
-
-### Medium Priority
-
-1.  **Network Features**: Interception/modification, Cookie/storage mgmt, Perf metrics.
-2.  **Testing**: Comprehensive coverage (Integration, Performance).
-3.  **Error Handling**: Standardized responses, Better reporting, Graceful degradation.
+5.  **DevEx**: API docs, CLI tool, Examples.
 
 ## Current Status Summary
-
-Core features implemented. Phase 1 test stabilization complete. Focus shifts to Phase 2: Enhancing robustness and adding features.
-
-## Known Issues
-- **(Resolved)** Test Suite Hang: Test suite previously hung during teardown.
-- **(Resolved)** Inconsistent Fixture Usage: Tests were not consistently using shared fixtures.
-- **(Resolved)** Potential Cleanup Fragility: Cleanup logic improved.
+*   Phase 1 (Test Stabilization) Complete.
+*   Phase 2 (Robustness Enhancement) In Progress.
+*   **Blocker**: Investigating `page.goto()` timeout in network tests (see `active-context.md`).
 
 ## Next Steps
-- Execute Phase 2: Enhance Robustness (Evaluate test isolation, add test coverage).
-- Begin implementing high-priority features: Security, Verification, Monitoring, DevEx.
-- Update `system-patterns.md` with lessons learned from stabilization.
+*   Resolve `page.goto()` timeout blocker.
+*   Continue Phase 2: Add test coverage (error handling, resource monitoring details).
+*   Begin implementing high-priority features (Security, Verification, Monitoring, DevEx).
 
 ## Progress Checklist
+*   [x] Base Project Setup
+*   [x] Core APIs & MCP Integration
+*   [x] Basic Security & Infra
+*   [x] Test Suite Stabilization (Phase 1)
+*   [/] Phase 2: Robustness (In Progress - Blocked)
+    *   [ ] Resolve `page.goto()` Timeout
+    *   [ ] Add Network Routing Tests (Blocked by Timeout)
+    *   [ ] Add Error Handling Tests
+    *   [ ] Refine Resource Monitoring Tests
+*   [ ] Resource Management (Perf)
+*   [ ] Security Enhancements
+*   [ ] Verification Agent
+*   [ ] Monitoring Integration
+*   [ ] Developer Experience
 
-*   [x] Project structure
-*   [x] Basic FastAPI server
-*   [x] Playwright integration
-*   [x] WebSocket interface
-*   [x] Core Frontend Analysis APIs
-*   [x] MCP Protocol Extensions
-*   [x] Basic Security (AppArmor, non-root)
-*   [x] Test Suite Stabilization (Hang fix, fixture refactor, cleanup)
-*   [ ] Resource Management (Context/Pooling/Cleanup Robustness & Perf)
-*   [ ] Security Enhancements (Rate Limit, Net Isolation)
-*   [ ] Verification Agent (Static Analysis, Tests)
-*   [ ] Monitoring Integration (NetData, Loki, etc.)
-*   [ ] Developer Experience (Docs, CLI, Examples)
-
-## Next Milestones (Target)
-
-*   **April 2024**: Complete resource management robustness.
-*   **May 2024**: Implement security enhancements.
-*   **May 2024**: Integrate verification tools.
-*   **June 2024**: Set up monitoring infrastructure.
-*   **June 2024**: Enhance developer experience.
-*   **July 2024**: Production readiness. 
+## Target Milestones (Adjusted)
+*   **TBD**: Complete resource mgmt robustness (Blocked by test timeout).
+*   **TBD**: Implement security enhancements.
+*   **TBD**: Integrate verification tools.
+*   **TBD**: Set up monitoring infrastructure.
+*   **TBD**: Enhance developer experience. 

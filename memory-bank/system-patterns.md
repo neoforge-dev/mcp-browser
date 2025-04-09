@@ -1,42 +1,51 @@
-# System Architecture & Patterns - MCP Browser
+# System Architecture & Patterns - MCP Browser (Optimized)
 
 ## Architecture Overview
-
-*   FastAPI app bridging clients (L3 AI Agents via MCP) and Playwright (headless browser).
-*   Modular: HTTP API, WebSocket, Browser Control, Error Handling, Data Processing layers.
+*   FastAPI service acts as a facade over Playwright/Chromium.
+*   Uses Xvfb for headless rendering.
+*   Runs within Docker with AppArmor/resource limits.
+*   Communicates with AI agents via MCP (WebSocket/HTTP).
 
 ```mermaid
 graph TD
-    A[L3 AI Agent] -->|MCP over SSH| C(MCP Browser Service);
-    C -->|Playwright API| D(Playwright Engine);
-    D -->|Browser Control| E(Headless Chromium);
-    E -->|Render via| F(Xvfb Virtual Display);
-    C --> G(Resource Monitor);
-    C --> H(Security Sandbox);
-    subgraph "Docker Container" 
-        direction LR
-        C; D; E; F; G; H;
+    A[AI Agent] -->|MCP| B(FastAPI Service);
+    subgraph Docker
+      B --> C{Playwright};
+      C --> D[Chromium];
+      D --> E(Xvfb);
+      B --> F(Security Sandbox);
+      B --> G(Resource Monitor);
     end
 ```
 
-## Key Components & Responsibilities
+## Key Components
+*   **FastAPI Service**: API endpoints, WebSocket handling, command processing, pool management.
+*   **BrowserPool/Instance**: Manages Playwright browser lifecycle, contexts, resource monitoring (idle/limits), network isolation rules.
+*   **Playwright Engine**: Executes browser actions.
+*   **Xvfb Display**: Enables visual operations in headless mode.
+*   **Docker Container**: Isolation, dependency management, security boundaries (AppArmor, non-root, network).
 
-*   **MCP Browser Service (FastAPI)**: Manage sessions, process MCP commands, return output, log, handle security.
-*   **Playwright Engine**: Launch/manage browser, execute actions, capture state.
-*   **Xvfb Display**: Provide X11 env for headless browser, enable visual ops.
-*   **Docker Container**: Consistent/isolated environment, resource mgmt, security boundaries.
-*   **SSH Tunnel**: Secure remote access & encryption.
+## Design Patterns
+*   **Facade**: `BrowserPool`/`FastAPI` simplifies Playwright interaction.
+*   **Command**: API requests map to browser actions.
+*   **Observer**: WebSockets for event streaming.
+*   **Factory/Pool**: `BrowserPool` manages `BrowserInstance` creation/reuse/cleanup.
+*   **Dependency Injection**: Used implicitly by FastAPI, useful for testing.
+*   **Error Handling**: Custom `MCPBrowserException`, standardized codes/responses.
 
-## Design Patterns Employed
+## Security Strategy (Defense-in-Depth)
+*   **Network**: Docker networks, Optional SSH Tunnel, Rate Limiting (TODO), `BrowserPool` domain filtering.
+*   **Application**: Input validation (Pydantic), Auth (TODO).
+*   **Container**: AppArmor, Non-root user, Resource quotas (Docker).
+*   **Browser**: Isolated contexts.
 
-*   **Microservice**: Single responsibility components, defined interfaces.
-*   **Command**: Browser ops as commands (serialized, validated, executed).
-*   **Observer**: WebSockets for real-time state updates (pub/sub).
-*   **Factory**: Browser instance creation & config management.
-*   **REST API**: Resource-oriented endpoints, JSON payloads, consistent responses.
-*   **WebSocket**: Connection pool, pub/sub management, event filtering (URL, page ID).
-*   **Facade**: Simplified browser control interface over Playwright complexity.
-*   **Error Handling**: Standardized structure (code, msg), detailed logging.
+## Key Technical Decisions
+*   **Playwright/Chromium**: Reliability, modern API.
+*   **FastAPI**: Async performance, type safety, docs.
+*   **Docker**: Consistency, isolation.
+*   **Xvfb**: Lightweight headless visual rendering.
+*   **uv**: Fast package management.
+*   **pytest**: Testing framework.
 
 ## Data Flow Summary
 
@@ -47,21 +56,6 @@ graph TD
 5.  Results captured (DOM, screenshot, etc.).
 6.  Service formats/returns results.
 7.  Operation logged.
-
-## Security Architecture (Defense-in-Depth)
-
-*   **Network**: SSH Tunnel encryption, Firewall rules, Rate limiting.
-*   **Application**: JWT Auth, Input validation/sanitization.
-*   **Container**: AppArmor, Non-root user, Resource quotas.
-*   **Browser**: Isolated contexts, No persistent storage, Network restrictions (planned).
-
-## Key Technical Decisions & Rationale
-
-*   **Playwright**: Reliability, cross-browser, modern API, performance.
-*   **Chromium**: Best compatibility, perf, dev tools, security updates.
-*   **Docker**: Consistency, isolation, dependency mgmt, scaling.
-*   **FastAPI**: Async perf, auto-docs, type safety, WebSocket support.
-*   **Xvfb**: Lightweight, no GPU needed, stable for headless.
 
 ## Core API Endpoint Examples (Structure)
 

@@ -56,15 +56,16 @@ class BrowserInstance:
             logger.info(f"Initializing browser instance {self.id}")
             self._playwright = await async_playwright().start()
             
-            # --- DEBUG: Minimize launch args --- 
-            # launch_args = [
-            #     '--disable-dev-shm-usage',  # Avoid /dev/shm issues in Docker
-            #     '--no-sandbox',  # Required for Docker
-            #     '--disable-gpu',  # Reduce resource usage
-            #     '--disable-software-rasterizer',  # Reduce memory usage
-            #     '--disable-extensions',  # Disable extensions
-            #     f'--js-flags=--max-old-space-size={256}',  # Limit JS heap
-            # ]
+            # Launch browser with resource constraints and isolation args
+            launch_args = [
+                '--disable-dev-shm-usage',  # Avoid /dev/shm issues in Docker
+                '--no-sandbox',  # Required for Docker
+                '--disable-gpu',  # Reduce resource usage
+                '--disable-software-rasterizer',  # Reduce memory usage
+                '--disable-extensions',  # Disable extensions
+                f'--js-flags=--max-old-space-size={256}',  # Limit JS heap
+            ]
+            # Temporarily disable adding network isolation launch args
             # if self.network_isolation:
             #      # Experimental flags, might change based on Chromium version
             #      launch_args.extend([
@@ -81,16 +82,16 @@ class BrowserInstance:
             #          '--enable-strict-mixed-content-checking',
             #          '--use-mock-keychain', # Prevent keychain access
             #      ])
-            launch_args = ['--no-sandbox'] # Minimal args for debugging
-            logger.warning(f"[DEBUG] Using minimal launch_args: {launch_args}")
-            # --- END DEBUG --- 
 
             self.browser = await self._playwright.chromium.launch(
-                args=launch_args,
+                args=launch_args, # Use modified args
                 handle_sigint=True,
                 handle_sigterm=True,
-                handle_sighup=True
+                handle_sighup=True,
+                headless=True
             )
+            
+            logger.warning("[DEBUG] Chromium launched with modified args.") # Updated log
             
             logger.info(f"Browser instance {self.id} initialized successfully.")
 
@@ -143,10 +144,12 @@ class BrowserInstance:
             # Create the context with resource limits
             context = await self.browser.new_context(**context_params)
             
-            # Set up network request interception if isolation is enabled
-            if self.network_isolation:
-                 logger.info(f"Enabling network request interception for context {context_id} in browser {self.id}")
-                 await context.route("**/*", self._handle_route)
+            # Temporarily disable network isolation logic entirely
+            if False:
+                if self.network_isolation:
+                    logger.info(f"Enabling network request interception for context {context_id} in browser {self.id}")
+                    # Ensure the route handler is correctly bound if needed
+                    # await context.route("**/*", self._handle_route) # Keep this commented
 
             # Set default timeout
             context.set_default_timeout(30000)
@@ -291,6 +294,8 @@ class BrowserInstance:
         try:
             domain = url.split('/')[2].split(':')[0] # Extract domain name
             logger.debug(f"{log_prefix} Extracted domain: {domain}")
+            # Force flush after logging
+            for handler in logger.handlers: handler.flush()
         except IndexError:
             logger.warning(f"{log_prefix} Could not extract domain from URL: {url}. Allowing by default.")
             try:
@@ -321,14 +326,23 @@ class BrowserInstance:
 
         # Allow the request if it passes all checks
         logger.debug(f"{log_prefix} Allowing request to {url} (Domain: {domain})")
+        for handler in logger.handlers: handler.flush() # Flush before continue
         try:
+            logger.info(f"{log_prefix} Attempting route.continue_() for {url}")
+            for handler in logger.handlers: handler.flush() # Flush before await
             await route.continue_()
-            logger.debug(f"{log_prefix} Successfully continued request to {url}")
+            logger.info(f"{log_prefix} Successfully completed route.continue_() for {url}")
+            for handler in logger.handlers: handler.flush() # Flush after await
         except Exception as e:
-             logger.error(f"{log_prefix} Error continuing allowed request to {url}: {e}")
-             # Attempt to abort if continue fails, otherwise it might hang
-             try: await route.abort() 
-             except: pass
+            logger.error(f"{log_prefix} Error during route.continue_() for {url}: {e}")
+            for handler in logger.handlers: handler.flush() # Flush on error
+            # Attempt to abort if continue fails, otherwise it might hang
+            try: 
+                logger.warning(f"{log_prefix} Attempting route.abort() after continue failed for {url}")
+                await route.abort() 
+                logger.warning(f"{log_prefix} Successfully aborted route after continue failed for {url}")
+            except Exception as abort_exc:
+                logger.error(f"{log_prefix} Error aborting route after continue failed for {url}: {abort_exc}")
 
 class BrowserPool:
     """Manages a pool of browser instances"""
@@ -368,7 +382,9 @@ class BrowserPool:
         self._shutting_down = False
 
         # Network Isolation Settings
-        self.network_isolation = network_isolation
+        # Temporarily force network isolation off to test baseline navigation
+        self.network_isolation = False # <-- Force to False
+        # self.network_isolation = network_isolation # Original line
         self.allowed_domains: Set[str] = set(allowed_domains) if allowed_domains else set()
         self.blocked_domains: Set[str] = set(blocked_domains) if blocked_domains else set()
 

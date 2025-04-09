@@ -1,37 +1,27 @@
-# Product Context - MCP Browser
+# Product Context - MCP Browser (Optimized)
 
-## Problem
+## Problem & Solution
+*   **Problem**: AI agents lack secure, efficient, high-fidelity browser automation.
+*   **Solution**: MCP Browser provides this via a dedicated service.
 
-*   AI agents need accurate, secure, resource-efficient browser testing.
-*   Current solutions lack rendering fidelity, are resource-heavy, insecure, and complex to integrate.
+## Target Users & Goals
+*   **AI Agents (L3/MCP)**: Need seamless control, rich feedback (visuals, DOM), stable API.
+*   **DevOps**: Need simple deployment (`docker-compose`), config, monitoring.
 
-## Solution: MCP Browser
-
-*   Secure, efficient browser automation designed for AI agents (MCP).
-*   Enables AI to interact with apps, capture visuals, inspect DOM/CSS, detect issues, verify responsive design.
-
-## Target Users
-
-*   **Primary**: AI Coding Agents (L3 via MCP).
-*   **Secondary**: DevOps (Deployment, Security Config).
-*   **Tertiary**: Developers/QA (Using AI test results).
-
-## User Experience Goals
-
-*   **AI Agents**: Seamless MCP control, rich rendering feedback, stable API.
-*   **DevOps**: One-command deploy, simple config, monitoring, low maintenance.
-*   **Developers**: Accurate issue reporting, detailed evidence for debugging.
+## Key Features for AI
+*   Interact with web apps (navigate, click, type).
+*   Capture visuals (screenshots).
+*   Inspect structure (DOM, CSS).
+*   Detect rendering/accessibility issues.
+*   Verify responsive design.
 
 ## Business Value
+*   Enhances AI testing capabilities.
+*   Reduces infra costs (vs. full browsers).
+*   Improves dev efficiency (faster bug detection/debug).
+*   Provides secure test environment.
 
-*   Enhances AI frontend testing capabilities.
-*   Reduces resource costs (>90% RAM saving vs full browsers).
-*   Improves engineering efficiency (early bug detection).
-*   Ensures rendering consistency.
-*   Provides secure testing environment.
-
-## Success Metrics (Key Targets)
-
-*   **Performance**: < 3s startup, < 300MB RAM/instance, 99.9% uptime.
-*   **User Success**: AI finds >95% visual issues, < 10min setup, 0 security escapes.
-*   **Business**: Reduced missed frontend bugs, faster debug cycles, lower infra costs. 
+## Key Success Metrics
+*   **Performance**: < 3s startup, < 300MB RAM/instance.
+*   **Agent Success**: High visual issue detection rate (>95%).
+*   **Security**: Zero escapes from sandbox. 

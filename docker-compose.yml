@@ -6,18 +6,25 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-browser
+    shm_size: "2gb"
+    env_file:
+      - .env
     environment:
       - PYTHONPATH=/app
-      - DISPLAY=:99
-      - NETWORK_ISOLATION=true
-      - ALLOWED_DOMAINS=example.com
-      - BLOCKED_DOMAINS=blocked.com
       - RUN_TESTS=${RUN_TESTS:-false}
+      - DISPLAY=:99
+      - DEBUG=pw:api,pw:browser
+    ports:
+      - "${MCP_PORT:-8000}:8000"
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./requirements-test.txt:/app/requirements-test.txt
       - /var/run/docker.sock:/var/run/docker.sock
+      - playwright_cache:/root/.cache/ms-playwright
     networks:
+      - default
       - mcp-browser-internal
       - mcp-browser-external
       - mcp-browser-monitoring
@@ -34,19 +41,10 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-      nproc:
-        soft: 65536
-        hard: 65536
-    ports:
-      - "7665:7665"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7665/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 networks:
+  default:
+    driver: bridge
   mcp-browser-internal:
     driver: bridge
     ipam:
@@ -65,3 +63,6 @@ networks:
       config:
         - subnet: 172.22.0.0/16
           gateway: 172.22.0.1
+
+volumes:
+  playwright_cache:

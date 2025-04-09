@@ -1,4 +1,33 @@
-# Active Context - MCP Browser (v0.4.0)
+# Active Context - MCP Browser (Optimized)
+
+## Current Phase: Phase 2 - Enhancing Robustness
+
+## Immediate Focus / Blockers
+*   **Test Timeout**: `test_allowed_domain_access` times out during `page.goto()`.
+    *   *Current Hypothesis*: Environmental issue (Xvfb, Playwright version, Docker setup). Previous debugging ruled out network isolation code, launch args.
+    *   *Next Action*: Test with forced headless mode (bypassing Xvfb).
+*   **Docker Env Tests**: Multiple Docker environment checks fail (`test_network_configuration`, `test_container_network_access`, etc.) - requires manual `docker-compose down` / cleanup outside this scope.
+
+## Phase 2 Goals
+1.  Resolve `page.goto()` timeout in network tests.
+2.  Enhance resource management cleanup robustness (ongoing).
+3.  Add test coverage (network routing rules, error handling, resource monitoring details).
+4.  Implement basic API rate limiting.
+5.  Select & integrate static analysis tool.
+6.  Set up basic system monitoring (NetData).
+
+## Key Decisions / Strategy Reminders
+*   **Resource Mgmt**: Context pooling; LRU eviction on resource limits.
+*   **Security**: FastAPI middleware (rate limit); Docker network isolation; AppArmor.
+*   **Verification**: Pytest.
+*   **Testing**: Session-scoped `browser_pool`, function-scoped `browser_context` (current setup).
+
+## Open Questions
+*   Root cause of `page.goto()` timeout?
+*   Optimal event broadcast optimization strategy?
+*   Rate limit details (limits, scope)?
+*   Static analysis tool choice?
+*   Monitoring config details (metrics, alerts)?
 
 ## Current Focus Areas
 
@@ -35,20 +64,12 @@
 *   **Monitoring**: Use NetData (system), Loki+Grafana (logs), cAdvisor (containers).
 *   **DevEx**: Use FastAPI docs; Click/Typer for CLI.
 
-## Open Questions / Blockers
-
-*   Optimal event broadcast optimization strategy?
-*   Efficient rate limiting details (limits, burst handling)?
-*   Best static analysis/security tools to integrate?
-*   Monitoring setup details (key metrics, alerting)?
-
 ## Current Sprint Goals (Refined for Phase 2)
-
-1.  Enhance resource management cleanup robustness.
-2.  Add test coverage for network isolation and error handling.
-3.  Implement basic API rate limiting.
-4.  Select and integrate a static analysis tool.
-5.  Set up basic system monitoring (NetData).
+1.  **Evaluate Test Isolation:** Assess if the current session-scoped fixture is sufficient or if function-scoped fixtures are needed for certain tests to prevent state leakage.
+2.  **Add Network Routing Tests:** Create tests specifically for validating `allowed_domains` and `blocked_domains` functionality.
+3.  **Add Error Handling Tests:** Test how the system behaves under various error conditions (e.g., Playwright errors, pool errors).
+4.  **Refine Resource Monitoring Tests:** Expand tests for resource limit enforcement (CPU, detailed memory).
+5.  **Update `system-patterns.md`**: Document fixture strategy and cleanup patterns.
 
 ## Current Work Focus
 - **Phase 2: Enhancing Robustness**

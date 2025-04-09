@@ -1,56 +1,51 @@
-# Technical Context - MCP Browser
+# Technical Context - MCP Browser (Optimized)
 
 ## Core Stack
 
-*   **Language/Framework**: Python 3.13+, FastAPI
-*   **Browser Automation**: Playwright (>=1.51.0) with Chromium
-*   **Infrastructure**: Docker (+Compose), Xvfb, AppArmor
-*   **Comms**: WebSockets (>=15.0.1), HTTPS (via Uvicorn)
-*   **Package Manager**: uv
+*   **Language**: Python 3.13+
+*   **Framework**: FastAPI (>=0.108.0)
+*   **Browser**: Playwright (>=1.51.0) with Chromium
+*   **Container**: Docker (+Compose)
+*   **Display**: Xvfb
+*   **Security**: AppArmor
+*   **Comms**: WebSockets (websockets >=15.0.1), Uvicorn (>=0.24.0)
+*   **Packaging**: uv, pyproject.toml
 
-## Key Dependencies
+## Key Dependencies (Check `pyproject.toml` for full list)
 
-*   **Core**: `fastapi` (>=0.108.0), `playwright` (>=1.51.0), `uvicorn[standard]` (>=0.24.0), `websockets` (>=15.0.1), `psutil`, `pydantic` (>=2.0.0), `docker`
-*   **Security**: `python-jose` (>=3.4.0) (JWT), `passlib[bcrypt]` (>=1.7.4)
-*   **Utils**: `aiohttp` (>=3.11.14), `pyyaml` (>=6.0), `httpx` (>=0.28.1), `aiofiles` (>=24.1.0)
-*   **Testing**: `pytest` (>=8.2.0), `pytest-asyncio` (==0.25.3), `pytest-cov` (==4.1.0), `pytest-timeout`
+*   **Runtime**: `fastapi`, `playwright`, `uvicorn`, `websockets`, `psutil`, `pydantic`, `docker`
+*   **Testing**: `pytest`, `pytest-asyncio`, `pytest-cov`, `pytest-timeout`
 
-## Dev Environment Setup
+## Dev Environment
 
-*   **Prereqs**: Python 3.13+, Docker, uv, Git
-*   **Structure**: `src/`, `tests/`, `docker/`, `Dockerfile`, `docker-compose.yml`, `pyproject.toml` (`requirements-test.txt` for test deps)
-*   **Init**:
-    ```bash
-    git clone <repo_url>
-    cd mcp-browser
-    uv venv .venv
-    source .venv/bin/activate
-    uv pip install -e . # Installs project dependencies from pyproject.toml
-    uv pip install -r requirements-test.txt # Installs test dependencies
-    python -m playwright install chromium # Install browser if needed
-    # For Docker-based dev:
-    # docker-compose up -d
-    ```
-*   **Testing**: `pytest tests/` or via `make` targets
+*   **Prereqs**: Python 3.13+, Docker, uv
+*   **Setup**: `uv venv .venv && source .venv/bin/activate && uv pip install -e . && uv pip install -r requirements-test.txt`
+*   **Run (Docker)**: `docker-compose up -d`
+*   **Test**: `pytest tests/` or `make test`
 
-## Technical Constraints
+## Constraints & Considerations
 
-*   **Python Version**: >= 3.13 required due to dependencies/features.
-*   **Target Hardware**: Resource efficiency is critical (target < 300MB RAM/instance).
-*   **Security**: Non-root execution, AppArmor enforcement, resource limits mandatory.
-*   **Network**: SSH tunnel required for remote access in some deployment models.
-*   **Browser**: Primarily targets Chromium via Playwright.
+*   Python >= 3.13 required.
+*   Resource target: < 300MB RAM per browser instance.
+*   Security layers (AppArmor, non-root, resource limits, network isolation) are critical.
+
+## Deployment
+
+*   Docker Compose (`docker-compose.yml`).
+*   Config via `.env` file.
+
+## Testing
+
+*   `pytest` framework.
+*   Unit, Integration, E2E tests.
+*   Key plugins: `pytest-asyncio`, `pytest-cov`, `pytest-timeout`.
+*   Current Issue: Tests involving `page.goto` are timing out; requires further investigation (see `active-context.md`).
 
 ## Monitoring Stack (Planned)
 
 *   **System**: NetData
 *   **Logs**: Loki + Grafana
 *   **Containers**: cAdvisor
-
-## Deployment
-
-*   **Primary**: Docker Compose (`docker-compose.yml`) for local/production.
-*   **Environment**: Configured via `.env` file (see `.env.example`).
 
 ## Security Layers
 

@@ -29,7 +29,7 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+asyncio_mode = "strict"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
@@ -41,8 +41,7 @@ markers = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
-    "ignore::pytest.PytestDeprecationWarning",
-    "ignore::pytest_asyncio.PytestDeprecationWarning",
+    "ignore::_pytest.warning_types.PytestUnknownMarkWarning",
 ]
 timeout = 30
 timeout_method = "thread"
