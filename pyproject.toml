@@ -3,7 +3,7 @@ name = "mcp-browser"
 version = "0.1.0"
 description = "Enterprise-grade secure browser automation for L3 AI coding agents"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.108.0",
     "uvicorn[standard]>=0.24.0",

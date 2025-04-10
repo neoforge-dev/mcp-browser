@@ -1,5 +1,43 @@
 # Progress - MCP Browser (Optimized)
 
+## Current Status
+*   Phase 1 (Test Stabilization) Complete.
+*   Phase 2 (Robustness Enhancement) **Blocked** by `page.goto()` timeout in Docker tests.
+*   Multiple build/runtime errors resolved recently.
+
+## Immediate Next Steps
+1.  Run `make test` to confirm latest fixes allow container to start.
+2.  If container starts, verify if `page.goto()` timeout is resolved.
+3.  If timeout persists, investigate next hypothesis (Docker Desktop/Mac interaction).
+4.  If timeout resolved, unblock Phase 2 tasks (testing rate limits, network routing, etc.).
+
+## Completed (High Level)
+*   Core Service & APIs (FastAPI, Playwright integration).
+*   MCP Command Handling & WebSocket Events.
+*   Basic Security (AppArmor, Non-root).
+*   Docker Infrastructure.
+*   Test Suite Foundational Stabilization.
+*   Build/Dependency Management Refinement.
+
+## Pending / Blocked (Phase 2+)
+*   **Phase 2 (Blocked)**:
+    *   Resolve `page.goto()` Timeout **(BLOCKER)**
+    *   Test Network Routing Rules
+    *   Test Error Handling
+    *   Test Resource Monitoring
+    *   Test Rate Limiting
+*   Resource Management Perf Tuning.
+*   Security Hardening (Granular AppArmor, Auth?).
+*   Verification Agent Integration (Static Analysis).
+*   Monitoring Integration (NetData, Loki, etc.).
+*   Developer Experience (API Docs, CLI).
+
+## Key Blocker History
+*   Initial test hangs (Resolved - Fixture/Cleanup refactor).
+*   Dependency management issues (Resolved - `Dockerfile` fixes).
+*   Runtime import errors (Resolved - `main.py`, `rate_limiter.py` fixes).
+*   `page.goto()` timeout (Current Blocker).
+
 ## Completed Features
 *   Core APIs (Screenshot, DOM, CSS, Access., Responsive)
 *   MCP Extensions (Nav, DOM Manip, Visual Analysis)
@@ -14,32 +52,6 @@
 3.  **Verification**: Static analysis, Test coverage, Security checks.
 4.  **Monitoring**: NetData, Loki+Grafana, cAdvisor integration.
 5.  **DevEx**: API docs, CLI tool, Examples.
-
-## Current Status Summary
-*   Phase 1 (Test Stabilization) Complete.
-*   Phase 2 (Robustness Enhancement) In Progress.
-*   **Blocker**: Investigating `page.goto()` timeout in network tests (see `active-context.md`).
-
-## Next Steps
-*   Resolve `page.goto()` timeout blocker.
-*   Continue Phase 2: Add test coverage (error handling, resource monitoring details).
-*   Begin implementing high-priority features (Security, Verification, Monitoring, DevEx).
-
-## Progress Checklist
-*   [x] Base Project Setup
-*   [x] Core APIs & MCP Integration
-*   [x] Basic Security & Infra
-*   [x] Test Suite Stabilization (Phase 1)
-*   [/] Phase 2: Robustness (In Progress - Blocked)
-    *   [ ] Resolve `page.goto()` Timeout
-    *   [ ] Add Network Routing Tests (Blocked by Timeout)
-    *   [ ] Add Error Handling Tests
-    *   [ ] Refine Resource Monitoring Tests
-*   [ ] Resource Management (Perf)
-*   [ ] Security Enhancements
-*   [ ] Verification Agent
-*   [ ] Monitoring Integration
-*   [ ] Developer Experience
 
 ## Target Milestones (Adjusted)
 *   **TBD**: Complete resource mgmt robustness (Blocked by test timeout).

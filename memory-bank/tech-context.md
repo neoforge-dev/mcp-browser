@@ -1,27 +1,58 @@
 # Technical Context - MCP Browser (Optimized)
 
 ## Core Stack
-
-*   **Language**: Python 3.13+
-*   **Framework**: FastAPI (>=0.108.0)
-*   **Browser**: Playwright (>=1.51.0) with Chromium
-*   **Container**: Docker (+Compose)
-*   **Display**: Xvfb
+*   **Language**: Python >=3.12 (per `pyproject.toml` & Docker base image)
+*   **Framework**: FastAPI >=0.108.0
+*   **Browser**: Playwright >=1.51.0 (Currently using `v1.50.0-noble` base image)
+*   **Container**: Docker + Docker Compose
+*   **Display**: Xvfb (Currently disabled for testing)
 *   **Security**: AppArmor
-*   **Comms**: WebSockets (websockets >=15.0.1), Uvicorn (>=0.24.0)
-*   **Packaging**: uv, pyproject.toml
+*   **Server**: Uvicorn >=0.24.0
+*   **Packaging**: `pip` (via `pyproject.toml` `[project]` table & `requirements-test.txt`)
 
-## Key Dependencies (Check `pyproject.toml` for full list)
-
-*   **Runtime**: `fastapi`, `playwright`, `uvicorn`, `websockets`, `psutil`, `pydantic`, `docker`
+## Key Dependencies
+*   **Runtime**: `fastapi`, `playwright`, `uvicorn`, `websockets`, `psutil`, `pydantic`, `docker`, `starlette` (for middleware)
 *   **Testing**: `pytest`, `pytest-asyncio`, `pytest-cov`, `pytest-timeout`
+*   *See `pyproject.toml` and `requirements-test.txt` for exact versions/full list.*
 
 ## Dev Environment
-
-*   **Prereqs**: Python 3.13+, Docker, uv
-*   **Setup**: `uv venv .venv && source .venv/bin/activate && uv pip install -e . && uv pip install -r requirements-test.txt`
+*   **Prereqs**: Python 3.12+, Docker, Git
+*   **Setup**: Clone repo, `make build` (uses Docker)
 *   **Run (Docker)**: `docker-compose up -d`
-*   **Test**: `pytest tests/` or `make test`
+*   **Test (Docker)**: `make test` (builds image, runs container with `RUN_TESTS=true`, executes `pytest`)
+
+## Dockerfile (`Dockerfile`)
+*   Base: `mcr.microsoft.com/playwright:v1.50.0-noble` (Python 3.12.3)
+*   Uses `pip` in a `venv` (`/app/venv`).
+*   Installs test deps: `pip install -r requirements-test.txt`.
+*   Installs app & deps: `pip install .` (reads `[project]` from `pyproject.toml`).
+*   Copies `README.md` for build metadata.
+*   Installs Playwright browsers: `playwright install chromium --with-deps`.
+*   Entrypoint: `docker/xvfb-init.sh` (handles D-Bus, Xvfb).
+*   Default CMD: `python3 src/main.py`.
+
+## Docker Compose (`docker-compose.yml`)
+*   Defines `mcp-browser` service.
+*   Builds from `Dockerfile`.
+*   Sets `RUN_TESTS=true` via `command` override in `Makefile` for `make test`.
+*   Network: Currently uses default bridge network (explicit networks removed for testing).
+*   Volumes: Mounts `/dev/shm` (optional, for performance).
+*   Environment: `DISPLAY=:99` (currently commented out), `.env` file overrides.
+*   Security: AppArmor profile (`docker/apparmor/`), `security_opt: no-new-privileges`.
+
+## Testing (`pytest`)
+*   Configuration: `pyproject.toml [tool.pytest.ini_options]`.
+*   Timeout: 300s (method: thread).
+*   Async mode: strict.
+*   Key Fixtures: `browser_pool` (session), `browser_context` (function).
+*   Current Issue: `page.goto()` timeout (see `active-context.md`).
+
+## Key File Locations
+*   Source: `src/`
+*   Tests: `tests/`
+*   Docker Config: `Dockerfile`, `docker-compose.yml`, `docker/`
+*   Dependencies: `pyproject.toml`, `requirements-test.txt`
+*   Makefile: `Makefile` (build/test commands)
 
 ## Constraints & Considerations
 

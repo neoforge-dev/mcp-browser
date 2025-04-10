@@ -14,6 +14,7 @@ from collections import defaultdict
 import re
 from fastapi import Request, HTTPException
 from error_handler import MCPBrowserException, ErrorCode
+import functools
 
 # Configure logging
 logging.basicConfig(
@@ -94,7 +95,7 @@ class RateLimiter:
         """Initialize rate limiter"""
         self.limiters: Dict[str, Dict[str, SlidingWindowCounter]] = defaultdict(dict)
         self.configs: Dict[str, RateLimitConfig] = {}
-        self._cleanup_task = None
+        self._cleanup_task: Optional[asyncio.Task] = None  # Initialize as None
         self._cleanup_lock = asyncio.Lock()
     
     def parse_limit(self, limit: str) -> Tuple[int, int]:
@@ -199,25 +200,71 @@ class RateLimiter:
                 
                 async with self._cleanup_lock:
                     now = time.time()
+                    logger.debug("Running rate limiter cleanup...")
+                    cleaned_endpoints = 0
+                    cleaned_clients = 0
                     for endpoint in list(self.limiters.keys()):
                         config = self.configs.get(endpoint)
                         if not config:
+                            logger.warning(f"No config found for endpoint {endpoint} during cleanup, skipping.")
                             continue
                         
-                        for client_id in list(self.limiters[endpoint].keys()):
-                            limiter = self.limiters[endpoint][client_id]
-                            if not limiter.requests or max(limiter.requests) < now - config.window:
-                                del self.limiters[endpoint][client_id]
+                        window_cutoff = now - config.window
+                        clients_to_remove = []
+                        for client_id, limiter in self.limiters[endpoint].items():
+                            # Clean requests within the limiter first
+                            async with limiter._cleanup_lock:
+                                limiter.requests = [ts for ts in limiter.requests if ts > window_cutoff]
+
+                            # Check if limiter is now empty and past its window
+                            if not limiter.requests: 
+                                # We can remove this client limiter if it's empty
+                                clients_to_remove.append(client_id)
+                                cleaned_clients += 1
+
+                        for client_id in clients_to_remove:
+                           del self.limiters[endpoint][client_id]
                         
+                        # If endpoint dict is empty, remove it too
                         if not self.limiters[endpoint]:
                             del self.limiters[endpoint]
-        
+                            cleaned_endpoints += 1
+                    
+                    if cleaned_clients > 0 or cleaned_endpoints > 0:
+                        logger.info(f"Rate limiter cleanup finished. Removed {cleaned_clients} client entries and {cleaned_endpoints} endpoint entries.")
+                    else:
+                         logger.debug("Rate limiter cleanup finished. No entries removed.")
+
         except asyncio.CancelledError:
             logger.info("Cleanup task cancelled")
         
         except Exception as e:
             logger.error(f"Error in cleanup task: {str(e)}", exc_info=True)
-    
+
+    async def start_cleanup_task(self):
+        """Starts the background cleanup task if it's not already running."""
+        if self._cleanup_task is None or self._cleanup_task.done():
+            try:
+                loop = asyncio.get_running_loop()
+                self._cleanup_task = loop.create_task(self.cleanup_old_entries())
+                logger.info("Rate limiter cleanup task started.")
+            except RuntimeError:
+                 logger.error("Failed to start rate limiter cleanup task: No running event loop.")
+        else:
+            logger.debug("Cleanup task already running.")
+            
+    async def stop_cleanup_task(self):
+         """Stops the background cleanup task."""
+         if self._cleanup_task and not self._cleanup_task.done():
+             self._cleanup_task.cancel()
+             try:
+                 await self._cleanup_task
+             except asyncio.CancelledError:
+                 logger.info("Rate limiter cleanup task successfully stopped.")
+             self._cleanup_task = None
+         else:
+             logger.debug("Cleanup task not running or already stopped.")
+
     def limit(self, limit: str, exempt_with_token: bool = False):
         """
         Rate limiting decorator
@@ -233,42 +280,65 @@ class RateLimiter:
         
         def decorator(func):
             # Store config for this endpoint
-            endpoint = func.__name__
+            endpoint = f"{func.__module__}.{func.__name__}" # Use a more unique identifier
+            if endpoint in self.configs:
+                 logger.warning(f"Overwriting rate limit config for endpoint: {endpoint}")
             self.configs[endpoint] = RateLimitConfig(
                 requests=requests,
                 window=window,
                 exempt_with_token=exempt_with_token
             )
+            logger.debug(f"Registered rate limit for {endpoint}: {requests}/{window}s, exempt_with_token={exempt_with_token}")
+
+            # REMOVED: Do not start cleanup task here
+            # if not self._cleanup_task:
+            #     self._cleanup_task = asyncio.create_task(self.cleanup_old_entries())
             
-            # Start cleanup task if not running
-            if not self._cleanup_task:
-                self._cleanup_task = asyncio.create_task(self.cleanup_old_entries())
-            
-            async def wrapper(request: Request, *args, **kwargs):
+            @functools.wraps(func) # Preserve original function metadata
+            async def wrapper(*args, **kwargs):
+                # Find the Request object in args or kwargs
+                request: Optional[Request] = None
+                if 'request' in kwargs:
+                    request = kwargs['request']
+                else:
+                    for arg in args:
+                        if isinstance(arg, Request):
+                            request = arg
+                            break
+                
+                if not request:
+                     logger.error(f"Rate limit decorator applied to endpoint {endpoint} without a Request argument.")
+                     # Fallback: Proceed without rate limiting or raise an error
+                     # Raising an error is safer during development
+                     raise TypeError(f"Endpoint {endpoint} must accept 'request: Request' as an argument for rate limiting.")
+                     # return await func(*args, **kwargs) 
+
                 config = self.configs[endpoint]
                 
                 # Check for auth exemption
                 if config.exempt_with_token and self.is_authenticated(request):
-                    return await func(request, *args, **kwargs)
-                
-                # Get client ID and check rate limit
+                    logger.debug(f"Authenticated request to {endpoint}, rate limit exempted.")
+                    return await func(*args, **kwargs)
+
                 client_id = self.get_client_id(request)
-                is_limited, remaining, reset_time = await self.is_rate_limited(
+                
+                is_limited, remaining, reset = await self.is_rate_limited(
                     endpoint, client_id, config
                 )
                 
-                # Set rate limit headers
+                # Store headers in request state for middleware to pick up
                 request.state.rate_limit_headers = {
                     "X-RateLimit-Limit": str(config.requests),
                     "X-RateLimit-Remaining": str(remaining),
-                    "X-RateLimit-Reset": str(reset_time)
+                    "X-RateLimit-Reset": str(reset)
                 }
-                
+
                 if is_limited:
-                    raise RateLimitExceeded(config.requests, reset_time)
+                    logger.warning(f"Rate limit exceeded for {client_id} on endpoint {endpoint}")
+                    raise RateLimitExceeded(limit=config.requests, reset_time=reset)
                 
-                return await func(request, *args, **kwargs)
+                logger.debug(f"Request from {client_id} to {endpoint} allowed. Remaining: {remaining}")
+                return await func(*args, **kwargs)
             
             return wrapper
-        
-        return decorator 
+        return decorator

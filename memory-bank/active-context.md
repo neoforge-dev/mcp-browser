@@ -1,26 +1,49 @@
 # Active Context - MCP Browser (Optimized)
 
-## Current Phase: Phase 2 - Enhancing Robustness
+## Current Focus: Debugging `page.goto()` Timeout
 
-## Immediate Focus / Blockers
-*   **Test Timeout**: `test_allowed_domain_access` times out during `page.goto()`.
-    *   *Current Hypothesis*: Environmental issue (Xvfb, Playwright version, Docker setup). Previous debugging ruled out network isolation code, launch args.
-    *   *Next Action*: Test with forced headless mode (bypassing Xvfb).
-*   **Docker Env Tests**: Multiple Docker environment checks fail (`test_network_configuration`, `test_container_network_access`, etc.) - requires manual `docker-compose down` / cleanup outside this scope.
+*   **Status**: Blocked on resolving `page.goto()` hang in Docker test environment (`test_allowed_domain_access`, etc.). Affects Phase 2 (Robustness) progress.
+*   **History**: Ruled out network isolation code, launch args, Playwright versions (1.50/1.51), Xvfb requirement, D-Bus issues, specific Docker network config. Hang occurred with default bridge network.
+*   **Current Step**: Trying to fix Docker build/runtime errors related to dependency installation and Python imports (`RateLimitMiddleware`, `BaseHTTPMiddleware`) after latest `Dockerfile` changes.
+*   **Next Step (if build/runtime fixed)**: Re-run `make test` to check if `page.goto()` hang is resolved with latest `Dockerfile` and default bridge network.
+*   **Hypothesis (if hang persists)**: Docker Desktop for Mac virtualization interaction with Playwright/Chromium IPC or sandboxing.
 
-## Phase 2 Goals
-1.  Resolve `page.goto()` timeout in network tests.
-2.  Enhance resource management cleanup robustness (ongoing).
-3.  Add test coverage (network routing rules, error handling, resource monitoring details).
-4.  Implement basic API rate limiting.
+## Phase 2 Goals (Robustness Enhancement - Blocked/Partial)
+
+1.  **Resolve `page.goto()` timeout.** (BLOCKER)
+2.  Refine resource pool cleanup logic.
+3.  Add test coverage (network routing, error handling, resource limits).
+4.  Implement API rate limiting (Code added, needs testing).
 5.  Select & integrate static analysis tool.
 6.  Set up basic system monitoring (NetData).
 
-## Key Decisions / Strategy Reminders
-*   **Resource Mgmt**: Context pooling; LRU eviction on resource limits.
-*   **Security**: FastAPI middleware (rate limit); Docker network isolation; AppArmor.
-*   **Verification**: Pytest.
-*   **Testing**: Session-scoped `browser_pool`, function-scoped `browser_context` (current setup).
+## Blocked / Pending High-Priority Tasks
+
+*   Test network routing rules (Requires `page.goto` fix).
+*   Test rate limiting (Requires container to run).
+*   Resource mgmt performance optimization.
+*   Security hardening (Granular AppArmor, etc.).
+*   Verification Agent integration.
+*   Monitoring integration.
+*   DevEx (API Docs, CLI).
+
+## Recent Changes (Summary)
+
+*   Fixed multiple Docker build errors (`poetry` vs `pip`, `README.md` missing, Python version mismatch).
+*   Attempted to fix runtime errors (`BaseHTTPMiddleware` import, `RateLimiter` event loop).
+*   Simplified `docker-compose.yml` networking (removed custom networks).
+*   Removed Xvfb from `docker/xvfb-init.sh` and `docker-compose.yml` (temporarily).
+*   Increased pytest timeout to 300s.
+*   Tried Playwright v1.50.0 (vs v1.51.1).
+*   Cleaned up D-Bus PID handling in `docker/xvfb-init.sh`.
+*   Refactored test fixtures and `BrowserPool` cleanup (Phase 1).
+
+## Key Decisions / Reminders
+
+*   Using `pip install .` and `pip install -r requirements-test.txt` in `Dockerfile`.
+*   Test timeout: 300s.
+*   Playwright version: `v1.50.0-noble` base image (currently).
+*   Default bridge network used in `docker-compose.yml` (currently).
 
 ## Open Questions
 *   Root cause of `page.goto()` timeout?
@@ -37,15 +60,6 @@
 4.  **Verification Agent**: Static analysis, security checks.
 5.  **Monitoring**: Setup and integration.
 6.  **DevEx**: API Docs, CLI tool.
-
-## Recent Changes
-
-*   **Phase 1 Stabilization Complete**: Resolved test hangs by refactoring fixtures (`conftest.py`, `test_resource_management.py`), improving `BrowserPool` cleanup logic, and refining timeouts (`pyproject.toml`).
-*   Core frontend analysis APIs completed.
-*   MCP protocol extensions implemented.
-*   WebSocket event subscriptions functional (with filtering).
-*   Basic security (AppArmor, non-root) in place.
-*   Core documentation structure established.
 
 ## Technical Debt / Must-Have Tasks (Summary)
 

@@ -1,10 +1,36 @@
 # System Architecture & Patterns - MCP Browser (Optimized)
 
-## Architecture Overview
-*   FastAPI service acts as a facade over Playwright/Chromium.
-*   Uses Xvfb for headless rendering.
-*   Runs within Docker with AppArmor/resource limits.
-*   Communicates with AI agents via MCP (WebSocket/HTTP).
+## Core Flow
+*   AI Agent -> MCP -> FastAPI Service (Docker) -> Playwright -> Chromium (Headless/Xvfb) -> Results back.
+
+## Key Components
+*   **FastAPI**: API endpoints, WebSocket handling, command processing, pool management.
+*   **BrowserPool**: Manages Playwright browser lifecycle, contexts, resource monitoring, network isolation.
+*   **Docker**: Isolation (process, network, fs), dependencies, security (AppArmor, non-root, limits).
+
+## Design Patterns
+*   **Facade**: `BrowserPool` simplifies Playwright.
+*   **Command**: API requests map to browser actions.
+*   **Observer**: WebSockets for events.
+*   **Pool**: `BrowserPool` manages browser contexts.
+*   **DI**: FastAPI for dependencies.
+*   **Error Handling**: Custom exceptions, standard codes.
+
+## Security Strategy
+*   **Network**: Docker networks, Rate Limiting (middleware), Domain filtering (`BrowserPool`).
+*   **Application**: Input validation (Pydantic), Auth (TBD).
+*   **Container**: AppArmor, Non-root user, Resource quotas.
+*   **Browser**: Isolated contexts.
+
+## Key Technical Decisions
+*   **Tech**: Playwright/Chromium, FastAPI/Uvicorn, Docker, Python 3.12+.
+*   **Testing**: Pytest.
+
+## API Structure
+*   `/api/browser/*` (Actions: navigate, click, type, etc.)
+*   `/api/{feature}/*` (Analysis: screenshots, DOM, CSS, etc.)
+*   `/ws/events` (WebSocket for event stream).
+*   *Details*: OpenAPI docs / `src/main.py`.
 
 ```mermaid
 graph TD

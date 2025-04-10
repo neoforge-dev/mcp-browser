@@ -7,5 +7,4 @@ python-dotenv==1.0.1
 docker
 psutil
 pydantic
-fastapi
 pytest-timeout 

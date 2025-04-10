@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from rate_limiter import RateLimiter
 
 # Configure logging
@@ -85,6 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Initialize app state here
     
+    # Start the rate limiter cleanup task
+    await rate_limiter.start_cleanup_task()
+    
     logger.info("MCP Browser server started")
     
     # Add rate limit middleware
@@ -94,7 +97,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Shutdown: Cleanup resources
     
-    # Cleanup resources here
+    # Stop the rate limiter cleanup task
+    await rate_limiter.stop_cleanup_task()
+    
+    # Cleanup other resources here
     
     logger.info("MCP Browser server shut down")
 
