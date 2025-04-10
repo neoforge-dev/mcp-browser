@@ -11,9 +11,9 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-      - RUN_TESTS=${RUN_TESTS:-false}
+      - PYTEST_LOG_LEVEL=DEBUG
+      - PWDEBUG=1
       - DISPLAY=:99
-      - DEBUG=pw:api,pw:browser
     ports:
       - "${MCP_PORT:-8000}:8000"
     volumes:
@@ -25,22 +25,19 @@ services:
       - playwright_cache:/root/.cache/ms-playwright
     networks:
       - default
-      - mcp-browser-internal
-      - mcp-browser-external
-      - mcp-browser-monitoring
     security_opt:
-      - apparmor=mcp-browser
+      - apparmor:mcp-browser
     cap_add:
-      - NET_ADMIN
       - SYS_ADMIN
+      - NET_ADMIN
     sysctls:
       net.ipv4.tcp_syncookies: 1
       net.ipv4.tcp_max_syn_backlog: 1024
-      net.ipv4.tcp_synack_retries: 2
     ulimits:
       nofile:
         soft: 65536
         hard: 65536
+    command: /usr/local/bin/xvfb-init.sh
 
 networks:
   default:

@@ -64,6 +64,7 @@ class BrowserInstance:
                 '--disable-software-rasterizer',  # Reduce memory usage
                 '--disable-extensions',  # Disable extensions
                 f'--js-flags=--max-old-space-size={256}',  # Limit JS heap
+                # '--remote-debugging-port=0', # Reverted: Did not resolve issue
             ]
             # Temporarily disable adding network isolation launch args
             # if self.network_isolation:

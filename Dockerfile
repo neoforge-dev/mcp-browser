@@ -1,9 +1,18 @@
-FROM mcr.microsoft.com/playwright:v1.51.1-noble
+FROM mcr.microsoft.com/playwright:v1.50.0-noble
 
 # Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Install system dependencies needed for Python, venv, Xvfb, curl, ping
+    # Pin pip and setuptools for stability
+    PIP_VERSION=24.0 \
+    SETUPTOOLS_VERSION=69.5.1 \
+    # Install Poetry
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VERSION=1.8.2 \
+    PATH="$POETRY_HOME/bin:$PATH"
 
-# Install system dependencies
+# Install system packages
 RUN apt-get update && apt-get install -y \
     xvfb \
     curl \
@@ -11,36 +20,37 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3.12-venv \
     iputils-ping \
-    netcat-openbsd \
-    apparmor-utils \
-    dbus \
+    # Clean up apt cache
     && rm -rf /var/lib/apt/lists/*
 
-# Set up virtual environment
-ENV VIRTUAL_ENV=/app/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ENV PYTHONPATH=/app
-RUN python3 -m venv $VIRTUAL_ENV
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
 
-# Install Python dependencies
-COPY pyproject.toml requirements-test.txt /app/
+# Create app directory
 WORKDIR /app
-RUN pip install --no-cache-dir -r requirements-test.txt
 
-# Install Playwright browsers
-RUN python3 -m playwright install chromium
+# Copy dependency definition files
+COPY pyproject.toml poetry.lock* /app/
 
-# Copy application files
+# Install project dependencies using Poetry
+# --no-root: Don't install the project itself as editable, only dependencies
+# Using --no-cache-dir might not be necessary with Poetry but doesn't hurt
+RUN poetry install --no-interaction --no-ansi --no-root --without dev
+
+# Install Playwright browsers (redundant? Playwright base image should have them, but let's ensure)
+# Consider removing if base image guarantees browsers
+RUN python3 -m playwright install chromium --with-deps
+
+# Copy application source code and tests
 COPY src/ /app/src/
 COPY tests/ /app/tests/
 
-# Copy Xvfb init script
+# Copy and set permissions for the entrypoint script
 COPY docker/xvfb-init.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/xvfb-init.sh
 
-# Set environment variables
-ENV DISPLAY=:99
-ENV RUN_TESTS=false
+# Set the entrypoint
+ENTRYPOINT ["/usr/local/bin/xvfb-init.sh"]
 
-# Start Xvfb and run application or tests
-CMD ["/usr/local/bin/xvfb-init.sh"]
+# Default command (can be overridden)
+CMD ["python3", "src/main.py"]
