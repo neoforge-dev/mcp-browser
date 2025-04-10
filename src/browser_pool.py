@@ -59,7 +59,6 @@ class BrowserInstance:
             # Launch browser with resource constraints and isolation args
             launch_args = [
                 '--disable-dev-shm-usage',  # Avoid /dev/shm issues in Docker
-                '--no-sandbox',  # Required for Docker
                 '--disable-gpu',  # Reduce resource usage
                 '--disable-software-rasterizer',  # Reduce memory usage
                 '--disable-extensions',  # Disable extensions
@@ -84,6 +83,9 @@ class BrowserInstance:
             #          '--use-mock-keychain', # Prevent keychain access
             #      ])
 
+            # Add --no-sandbox for debugging hangs in Docker/Mac env
+            launch_args.append("--no-sandbox")
+
             self.browser = await self._playwright.chromium.launch(
                 args=launch_args, # Use modified args
                 handle_sigint=True,
@@ -92,7 +94,7 @@ class BrowserInstance:
                 headless=True
             )
             
-            logger.warning("[DEBUG] Chromium launched with modified args.") # Updated log
+            logger.warning("[DEBUG] Chromium launched with modified args including --no-sandbox.") # Updated log
             
             logger.info(f"Browser instance {self.id} initialized successfully.")
 
@@ -236,11 +238,9 @@ class BrowserInstance:
             if self.browser:
                 logger.debug(f"[Browser {self.id}] Closing browser process")
                 try:
-                    await asyncio.wait_for(self.browser.close(), timeout=5.0) # Added timeout
+                    # Increased timeout for browser close
+                    await asyncio.wait_for(self.browser.close(), timeout=15.0) 
                     logger.debug(f"[Browser {self.id}] Successfully closed browser process")
-                except asyncio.TimeoutError:
-                    logger.error(f"[Browser {self.id}] Timeout closing browser process")
-                    if not close_error: close_error = asyncio.TimeoutError("Browser close timeout")
                 except Exception as e:
                     logger.error(f"[Browser {self.id}] Error closing browser process: {e}", exc_info=True)
                     if not close_error: close_error = e
@@ -435,49 +435,42 @@ class BrowserPool:
         }
     
     async def _check_resource_limits(self) -> bool:
-        """Check if system resource usage is within limits. Closes LRU browser if exceeded."""
+        """Check system resource limits and potentially close browsers."""
+        # Simplified - checks overall system usage, not per-browser
+        # In a real scenario, track per-process usage if possible
         metrics = self._get_system_metrics()
-        memory_usage = metrics["memory_percent"]
-        cpu_usage = metrics["cpu_percent"]
+        mem_usage = metrics.get('memory_percent', 0)
+        cpu_usage = metrics.get('cpu_percent', 0)
+        
         limit_exceeded = False
-        lru_browser_id = None
+        offending_browser_id = None
 
-        if memory_usage > self.max_memory_percent:
-            logger.warning(f"Memory usage high: {memory_usage:.2f}% (Limit: {self.max_memory_percent}%)")
+        if mem_usage > self.max_memory_percent:
+            logger.warning(f"[Pool] System memory usage ({mem_usage:.1f}%) exceeds limit ({self.max_memory_percent}%)")
             limit_exceeded = True
         
         if cpu_usage > self.max_cpu_percent:
-            logger.warning(f"CPU usage high: {cpu_usage:.2f}% (Limit: {self.max_cpu_percent}%)")
+            logger.warning(f"[Pool] System CPU usage ({cpu_usage:.1f}%) exceeds limit ({self.max_cpu_percent}%)")
             limit_exceeded = True
 
         if limit_exceeded:
-            async with self.lock: # Acquire lock to safely access browsers list
-                if not self.browsers:
-                    logger.warning("Resource limit exceeded but no browsers to close.")
-                    return False # Cannot recover if no browsers exist
-
-                # Find the least recently used browser
-                lru_browser_id = min(self.browsers.keys(), key=lambda bid: self.browsers[bid].last_used)
-                logger.warning(f"Resource limit exceeded. Closing least recently used browser: {lru_browser_id}")
+            # Find a browser to close (e.g., the first one found, or oldest/most resource intensive)
+            # Simple strategy: close the first available browser instance
+            async with self.lock:
+                if self.browsers:
+                    # Get the ID of the first browser in the dictionary (arbitrary but simple)
+                    offending_browser_id = next(iter(self.browsers))
+                    logger.warning(f"[Pool] Resource limit exceeded. Attempting to close browser: {offending_browser_id}")
             
-            # Close the identified browser (outside the main lock to avoid deadlock)
-            try:
-                await self.close_browser(lru_browser_id)
-                # Recheck limits after closing one browser
-                metrics = self._get_system_metrics()
-                memory_usage = metrics["memory_percent"]
-                cpu_usage = metrics["cpu_percent"]
-                if memory_usage > self.max_memory_percent or cpu_usage > self.max_cpu_percent:
-                     logger.error(f"Resource usage still high after closing LRU browser {lru_browser_id}. Mem: {memory_usage:.2f}%, CPU: {cpu_usage:.2f}%")
-                     return False # Still exceeding limits
-                else:
-                     logger.info(f"Resource usage back within limits after closing {lru_browser_id}.")
-                     return True
-            except Exception as e:
-                 logger.error(f"Failed to close LRU browser {lru_browser_id} during resource limit check: {e}", exc_info=True)
-                 return False # Failed to recover
-
-        return True # Limits were not exceeded
+            if offending_browser_id:
+                try:
+                    # Ensure close_browser is awaited correctly
+                    await self.close_browser(offending_browser_id)
+                except Exception as e:
+                    logger.error(f"[Pool] Error during resource limit enforcement close for {offending_browser_id}: {e}")
+            return False # Indicate limit was exceeded
+        
+        return True # Limits are okay
     
     async def _close_idle_browsers(self, force_check=False):
         """Closes browser instances that have been idle for too long."""
@@ -526,54 +519,60 @@ class BrowserPool:
 
     async def get_browser(self) -> BrowserInstance:
         """
-        Get an available browser instance from the pool, creating one if necessary.
-        
+        Get an available browser instance from the pool.
+        Reuses idle instances if possible, otherwise creates a new one.
+
         Returns:
-            An available BrowserInstance
+            An available BrowserInstance.
             
         Raises:
-            MCPBrowserException: If resource limits are exceeded or browser creation fails.
+            MCPBrowserException: If the maximum number of browsers is reached and none are idle.
         """
         async with self.lock:
-            if self._shutting_down:
-                raise MCPBrowserException(ErrorCode.POOL_SHUTTING_DOWN, "Browser pool is shutting down")
+            # 1. Check for an idle browser instance to reuse
+            for instance_id, instance in self.browsers.items():
+                # Consider idle if no active contexts and not already closing
+                if not instance.contexts and not instance.is_closing:
+                    logger.info(f"[Pool] Reusing idle browser instance {instance_id}")
+                    instance.last_used = time.time() # Update last used time
+                    return instance
 
-            # Check resource limits before creating a new browser
-            if not await self._check_resource_limits():
-                raise MCPBrowserException(
-                    ErrorCode.RESOURCE_LIMIT_EXCEEDED,
-                    "System resource limits exceeded. Cannot create new browser"
-                )
-
-            # Check if we've reached the maximum number of browsers
+            # 2. If no idle instance, check if we can create a new one
             if len(self.browsers) >= self.max_browsers:
+                logger.error(f"[Pool] Max browsers ({self.max_browsers}) reached, no idle instances available.")
                 raise MCPBrowserException(
-                    ErrorCode.MAX_BROWSERS_REACHED,
-                    f"Maximum number of browsers ({self.max_browsers}) reached"
+                    error_code=ErrorCode.MAX_BROWSERS_REACHED,
+                    message=f"Maximum number of browsers ({self.max_browsers}) reached"
                 )
 
-            # Create a new browser instance
-            instance_id = str(uuid.uuid4())
-            browser_instance = BrowserInstance(
-                instance_id,
-                allowed_domains=self.allowed_domains,
-                blocked_domains=self.blocked_domains,
-                network_isolation=self.network_isolation
-            )
-
+            # 3. Create a new browser instance if limit not reached
+            browser_id = str(uuid.uuid4())
+            logger.info(f"[Pool] Creating new browser instance {browser_id} (current: {len(self.browsers)}, max: {self.max_browsers})")
             try:
-                await browser_instance.initialize()
-                self.browsers[instance_id] = browser_instance
-                logger.info(f"Created new browser instance {instance_id}")
-                return browser_instance
+                new_instance = BrowserInstance(
+                     browser_id, 
+                     network_isolation=self.network_isolation,
+                     allowed_domains=self.allowed_domains,
+                     blocked_domains=self.blocked_domains
+                 )
+                await new_instance.initialize() 
+                self.browsers[browser_id] = new_instance
+                logger.info(f"[Pool] Successfully created and added browser instance {browser_id}")
+                return new_instance
             except Exception as e:
-                logger.error(f"Failed to initialize browser {instance_id}: {e}")
-                await browser_instance.close()
+                logger.error(f"[Pool] Failed to create new browser instance {browser_id}: {e}", exc_info=True)
+                # Attempt cleanup if initialization failed
+                if 'new_instance' in locals() and new_instance:
+                    try:
+                        await new_instance.close()
+                    except Exception as close_exc:
+                         logger.error(f"[Pool] Error cleaning up partially initialized instance {browser_id}: {close_exc}")
+                # Re-raise as a pool error
                 raise MCPBrowserException(
-                    ErrorCode.BROWSER_INITIALIZATION_FAILED,
-                    f"Failed to initialize browser: {str(e)}",
-                    original_exception=e
-                )
+                     error_code=ErrorCode.BROWSER_INITIALIZATION_FAILED,
+                     message=f"Failed to create and initialize new browser instance: {e}",
+                     original_exception=e
+                 )
 
     async def close_browser(self, browser_id: str):
         """Close a specific browser instance and remove it from the pool."""
@@ -641,12 +640,11 @@ class BrowserPool:
                     if browser:
                         logger.debug(f"[Pool] Cleaning up browser {browser_id}")
                         try:
-                            # Using close_browser which now has internal timeouts
-                            await asyncio.wait_for(self.close_browser(browser_id), timeout=15.0) # Overall timeout for close_browser
-                        except asyncio.TimeoutError:
-                            logger.error(f"[Pool] Overall timeout cleaning up browser {browser_id}. Might be stuck.")
+                            # Rely on internal timeout within close_browser
+                            await self.close_browser(browser_id)
                         except Exception as e:
-                            logger.error(f"[Pool] Error during cleanup for browser {browser_id}: {e}")
+                            # Log error, but continue cleanup
+                            logger.error(f"[Pool] Error during cleanup call to close_browser for {browser_id}: {e}")
                     else:
                          logger.warning(f"[Pool] Browser {browser_id} not found during final cleanup loop, already removed?)")
                 

@@ -7,11 +7,10 @@ run: build
 	RUN_TESTS=false docker-compose up -d
 
 test: build
-	RUN_TESTS=true docker-compose up -d
-	docker-compose logs -f
+	@export RUN_TESTS=true && docker-compose up --exit-code-from mcp-browser --abort-on-container-exit
 
 test-network: build
-	RUN_TESTS=true docker-compose up -d
+	@export RUN_TESTS=true && docker-compose up -d
 	docker-compose exec mcp-browser pytest /app/tests/test_network_isolation.py -v
 
 clean:

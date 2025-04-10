@@ -99,7 +99,3 @@ fi
 # This part should not be reached if exec is used correctly above
 echo "Script finished unexpectedly."
 exit 1
-
-# Execute the command passed to the container (e.g., pytest or the main app)
-echo "Executing command: $@"
-exec "$@" # Use exec to replace the shell process 

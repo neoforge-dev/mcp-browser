@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("MCP Browser server started")
     
     # Add rate limit middleware
-    app.add_middleware(RateLimitMiddleware)
+    # app.add_middleware(RateLimitMiddleware) # Moved to after app instantiation
     
     yield  # Run the application
     
@@ -120,6 +120,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add Rate Limit middleware (Moved from lifespan)
+app.add_middleware(RateLimitMiddleware)
 
 # Define auth functions
 def create_access_token(data: dict, expires_delta: Optional[int] = None):

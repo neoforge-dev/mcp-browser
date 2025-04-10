@@ -1,18 +1,18 @@
-# Product Context - MCP Browser (Optimized)
+# Product Context - MCP Browser
 
 ## Need
-*   AI agents need secure, efficient, high-fidelity browser automation for testing.
+- AI agents require secure browser automation for testing
 
-## Users & Goals
-*   **AI Agents (MCP)**: Seamless control, rich feedback (visuals, DOM), stable API.
-*   **DevOps**: Simple deployment (`docker-compose`), configuration, monitoring.
+## Users
+- **AI Agents**: Control, visual/DOM feedback
+- **DevOps**: Simple deployment/monitoring
 
-## Key Value
-*   Enhances AI testing capabilities.
-*   Reduces infrastructure costs (vs. full browsers).
-*   Improves development efficiency (secure, automated testing).
+## Value
+- Enhanced AI testing
+- Lower infra costs
+- Improved development efficiency
 
-## Success Metrics (Key)
-*   **Performance**: < 3s startup, < 300MB RAM/instance.
-*   **Agent Success**: >95% visual issue detection rate.
-*   **Security**: Zero sandbox escapes. 
+## Metrics
+- <3s startup, <300MB RAM/instance
+- >95% detection rate
+- Zero sandbox escapes 

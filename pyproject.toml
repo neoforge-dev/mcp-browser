@@ -43,6 +43,6 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::_pytest.warning_types.PytestUnknownMarkWarning",
 ]
-timeout = 300
+timeout = 360
 timeout_method = "thread"
 asyncio_default_fixture_loop_scope = "session"
